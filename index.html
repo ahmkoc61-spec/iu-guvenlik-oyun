@@ -1,0 +1,3500 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>İÜ Beyazıt Kapısı Güvenlik Kontrol Simülasyonu</title>
+  <style>
+    /* ==========================================================================
+       RESET & TEMİZ, KRİSTAL NETLİĞİNDE TİPOGRAFİ (SIFIR SCANLINE/ÇİZGİ)
+       ========================================================================== */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      background-color: #0e1215;
+      font-family: 'Consolas', 'Segoe UI', -apple-system, BlinkMacSystemFont, monospace;
+      color: #e6edf3;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* TOP STATUS BAR */
+    header.status-bar {
+      height: 52px;
+      background: #151c20;
+      border-bottom: 2px solid #28373e;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 50;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    }
+
+    .status-left, .status-center, .status-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .badge-label {
+      font-size: 11px;
+      color: #8fa0a8;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    .badge-val {
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+      background: #090d0f;
+      padding: 4px 12px;
+      border: 1px solid #2f3e46;
+      border-radius: 4px;
+    }
+
+    /* WARNING / STRIKE INDICATOR */
+    .strikes-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #090d0f;
+      padding: 5px 12px;
+      border: 1px solid #4a2222;
+      border-radius: 4px;
+    }
+
+    .strike-lamp {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #2b1212;
+      border: 2px solid #5a1e1e;
+      transition: all 0.25s ease;
+    }
+
+    .strike-lamp.active {
+      background: #ff3333;
+      border-color: #ff9999;
+      box-shadow: 0 0 12px #ff2222;
+      animation: pulse-red 1s infinite alternate;
+    }
+
+    @keyframes pulse-red {
+      from { transform: scale(1); filter: brightness(1); }
+      to { transform: scale(1.15); filter: brightness(1.3); }
+    }
+
+    .header-btn {
+      background: #202b30;
+      color: #e6edf3;
+      border: 1px solid #3d4f57;
+      padding: 7px 14px;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 700;
+      border-radius: 4px;
+      transition: background 0.2s, border-color 0.2s, transform 0.1s;
+    }
+
+    .header-btn:hover {
+      background: #2d3d45;
+      border-color: #556c77;
+    }
+
+    .header-btn:active {
+      transform: translateY(1px);
+    }
+
+    /* MAIN GAME VIEWPORT */
+    #game-viewport {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ==========================================================================
+       ÜST SAHNE: İSTANBUL ÜNİVERSİTESİ TARİHİ BEYAZIT KAPISI (TAM EKRAN GENİŞLİK)
+       ========================================================================== */
+    #gate-stage {
+      height: 52%;
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+      background: #101622;
+      border-bottom: 4px solid #2a1f18;
+    }
+
+    /* Arka plan görsel kapsayıcısı: sağdan ve soldan sıfırlanmış, %100 tam genişlik */
+    .gate-bg-wrapper {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    .gate-bg-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 65%;
+      display: block;
+    }
+
+    /* Hafif atmosferik derinlik: sağ ve sol kenarlarda sıfır boşluk, pürüzsüz geçiş */
+    .gate-bg-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(8, 12, 22, 0.22) 0%, rgba(8, 12, 22, 0.0) 35%, rgba(8, 12, 22, 0.18) 100%);
+    }
+
+    /* ---------- KULÜBE TAVAN KİRİŞİ & CAM AYDINLATMASI ---------- */
+    .booth-frame {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 18;
+    }
+
+    .booth-glass {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(112deg, rgba(255,255,255,0) 20%, rgba(255,255,255,0.05) 27%, rgba(255,255,255,0) 36%),
+        linear-gradient(112deg, rgba(255,255,255,0) 58%, rgba(255,255,255,0.03) 63%, rgba(255,255,255,0) 68%),
+        rgba(110, 160, 190, 0.02);
+    }
+
+    .booth-ceiling {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: clamp(28px, 5.5vh, 40px);
+      background: linear-gradient(180deg, #17120f 0%, #3a2e26 55%, #2a211b 100%);
+      border-bottom: 3px solid #130e0b;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .booth-lamp {
+      position: absolute;
+      left: 50%;
+      top: 6px;
+      transform: translateX(-50%);
+      width: 24%;
+      height: 5px;
+      border-radius: 3px;
+      background: #fff6d8;
+      box-shadow: 0 0 16px 5px rgba(255, 236, 170, 0.35);
+    }
+
+    .booth-plate {
+      margin-top: 6px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      color: #d9c7a8;
+      text-transform: uppercase;
+    }
+
+    /* ==========================================================================
+       ÖĞRENCİ GİRİŞ & ÇIKIŞ: JS DÖNGÜSÜ YOK — SADECE CSS TRANSITION (GPU, translate3d + scale3d)
+       Taban durum = kapıdan uzak, küçük, saydam (geçişsiz). Sınıf değişince transition oynar.
+       ========================================================================== */
+    #student-container {
+      position: absolute;
+      bottom: 22px;
+      left: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 10;
+      transform-origin: center bottom;
+      transform: translate3d(-50%, -105px, 0) scale3d(0.32, 0.32, 1);
+      opacity: 0;
+      will-change: transform, opacity;
+      backface-visibility: hidden;
+    }
+
+    /* GELİŞ: kapıdan masaya yürüyerek büyür */
+    #student-container.arrived {
+      transform: translate3d(-50%, 0, 0) scale3d(1, 1, 1);
+      opacity: 1;
+      transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.35s ease-out;
+    }
+
+    /* KABUL: turnikeden geçip kampüse (sağ-ileri) */
+    #student-container.exit-approved {
+      transform: translate3d(240%, -70px, 0) scale3d(0.38, 0.38, 1);
+      opacity: 0;
+      transition: transform 0.7s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.6s ease-in 0.1s;
+    }
+
+    /* RET: omuzlar düşük, sokağa (sol-geri) */
+    #student-container.exit-rejected {
+      transform: translate3d(-280%, 25px, 0) scale3d(0.48, 0.48, 1);
+      opacity: 0;
+      transition: transform 0.7s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.6s ease-in 0.1s;
+    }
+
+    /* Karakter zemin gölgesi (hafif, GPU dostu) */
+    .student-ground-shadow {
+      position: absolute;
+      bottom: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 105px;
+      height: 14px;
+      background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 70%);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    #student-canvas {
+      width: 180px;
+      height: 210px;
+      display: block;
+      will-change: transform;
+      transform: translate3d(0, 0, 0);
+      backface-visibility: hidden;
+    }
+
+    /* ==========================================================================
+       KONUŞMA BALONU: karakterin ÇOCUK elemanı → yürürken/küçülürken onunla birlikte kayar ve ölçeklenir.
+       Konum: yüzün hemen sağında; kuyruk doğrudan ağız/yanak hizasını işaret eder.
+       (Karakter canvas'ı 180x210; ağız ≈ y 119px, yüz sağ kenarı ≈ x 126px)
+       ========================================================================== */
+    .speech-bubble {
+      position: absolute;
+      bottom: 69px;
+      left: calc(50% + 54px);
+      width: max-content;
+      min-width: 96px;
+      max-width: 230px;
+      background: #ffffff;
+      color: #1a1a24;
+      padding: 7px 13px;
+      font-size: 12.5px;
+      font-weight: 700;
+      line-height: 1.35;
+      border-radius: 14px;
+      border: 2px solid #233137;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+      white-space: normal;
+      word-break: break-word;
+      pointer-events: none;
+      z-index: 25;
+      opacity: 0;
+      transform: scale3d(0.2, 0.2, 1);
+      transform-origin: 0 75%;
+      will-change: transform, opacity;
+      backface-visibility: hidden;
+      transition: transform 0.22s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.15s ease-out;
+    }
+
+    .speech-bubble.visible {
+      opacity: 1;
+      transform: scale3d(1, 1, 1);
+    }
+
+    /* Kuyruk: sola, yüze doğru işaret eden üçgen (koyu kenar + beyaz dolgu) */
+    .speech-bubble::before {
+      content: '';
+      position: absolute;
+      left: -14px;
+      bottom: 11px;
+      width: 0;
+      height: 0;
+      border-top: 9px solid transparent;
+      border-bottom: 9px solid transparent;
+      border-right: 14px solid #233137;
+    }
+
+    .speech-bubble::after {
+      content: '';
+      position: absolute;
+      left: -12px;
+      bottom: 12px;
+      width: 0;
+      height: 0;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+      border-right: 14px solid #ffffff;
+    }
+
+    /* ==========================================================================
+       GÜVENLİK GÖREVLİSİNİN KOLLARI VE DAMGA VURMA ANİMASYONU
+       ========================================================================== */
+    .guard-arms-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 55;
+      overflow: hidden;
+    }
+
+    /* SOL KOL (Masanın solunda dinlenen kol, Türk Bayrağı armalı üniforma) */
+    .guard-arm-left {
+      position: absolute;
+      bottom: -20px;
+      left: -20px;
+      width: 210px;
+      height: 140px;
+      transform: rotate(18deg);
+      transition: transform 0.3s ease;
+    }
+
+    .arm-sleeve-left {
+      width: 160px;
+      height: 90px;
+      background: linear-gradient(135deg, #112130 0%, #1b2e42 60%, #0d1a27 100%);
+      border-radius: 20px 40px 10px 10px;
+      border: 2px solid #29435c;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* TÜRK BAYRAĞI & GÜVENLİK ARMASI */
+    .guard-patch {
+      background: #b71c1c;
+      border: 1.5px solid #d4af37;
+      border-radius: 4px;
+      padding: 3px 7px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+      transform: rotate(-12deg);
+    }
+
+    .guard-patch-flag {
+      font-size: 11px;
+    }
+
+    .guard-patch-text {
+      font-size: 9px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: 0.8px;
+    }
+
+    /* Sol Taktik Eldiven */
+    .guard-hand-left {
+      position: absolute;
+      right: 15px;
+      top: 15px;
+      width: 65px;
+      height: 52px;
+      background: #1e262c;
+      border: 2px solid #37474f;
+      border-radius: 12px 18px 8px 12px;
+      box-shadow: inset 0 2px 6px rgba(255,255,255,0.1), 0 5px 12px rgba(0,0,0,0.6);
+    }
+
+    /* SAĞ KOL (DAMGAYI TUTAN VE KARTA VURAN KOL) */
+    .guard-arm-right {
+      will-change: transform;
+      position: absolute;
+      bottom: -35px;
+      right: 40px;
+      width: 230px;
+      height: 190px;
+      transform-origin: right bottom;
+      transform: rotate(-10deg) translate(0px, 0px);
+      transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 56;
+    }
+
+    .arm-sleeve-right {
+      width: 170px;
+      height: 95px;
+      background: linear-gradient(225deg, #112130 0%, #1b2e42 60%, #0d1a27 100%);
+      border-radius: 40px 20px 10px 10px;
+      border: 2px solid #29435c;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .guard-patch-right {
+      background: #0d1a27;
+      border: 1.5px solid #d4af37;
+      border-radius: 4px;
+      padding: 3px 8px;
+      transform: rotate(10deg);
+    }
+
+    .guard-patch-right span {
+      font-size: 8.5px;
+      font-weight: 900;
+      color: #ffd700;
+      letter-spacing: 0.8px;
+    }
+
+    /* Sağ Taktik Eldiven */
+    .guard-hand-right {
+      position: absolute;
+      left: 15px;
+      top: 30px;
+      width: 70px;
+      height: 60px;
+      background: #1e262c;
+      border: 2px solid #37474f;
+      border-radius: 18px 12px 12px 18px;
+      box-shadow: inset 0 2px 6px rgba(255,255,255,0.1), 0 5px 15px rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ELDEKİ AHŞAP/PİRİNÇ RETRO DAMGA */
+    .held-stamp {
+      position: absolute;
+      left: -22px;
+      top: -24px;
+      width: 50px;
+      height: 62px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .held-stamp-knob {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #e67e22 0%, #a04000 100%);
+      border: 2px solid #5e2605;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    }
+
+    .held-stamp-shaft {
+      width: 12px;
+      height: 20px;
+      background: linear-gradient(to right, #b9770e 0%, #f39c12 50%, #7e5109 100%);
+      border-left: 1px solid #5e2605;
+      border-right: 1px solid #5e2605;
+    }
+
+    .held-stamp-base {
+      width: 48px;
+      height: 18px;
+      background: #2c3e50;
+      border-radius: 4px;
+      border: 2px solid #1a252f;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.6);
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+
+    .held-stamp-base.approved-glow {
+      background: #27ae60;
+      box-shadow: 0 0 15px #2ecc71;
+    }
+
+    .held-stamp-base.rejected-glow {
+      background: #c0392b;
+      box-shadow: 0 0 15px #e74c3c;
+    }
+
+    /* DAMGALAMA ANİMASYONU (KOL HIZLA KARTA UZANIR VE VURUR) */
+    .guard-arm-right.stamping-active {
+      animation: performStampHit 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) forwards;
+    }
+
+    @keyframes performStampHit {
+      0% {
+        transform: rotate(-10deg) translate(0px, 0px);
+      }
+      30% {
+        /* Kol yukarı kalkar ve kartın üzerine doğru uzanır */
+        transform: rotate(-22deg) translate(-310px, -70px) scale(1.15);
+      }
+      55% {
+        /* GÜÜM! Tam kartın merkezine darbe */
+        transform: rotate(-12deg) translate(-320px, 20px) scale(1.05);
+      }
+      75% {
+        /* Hafif geri sekme */
+        transform: rotate(-16deg) translate(-310px, -20px) scale(1.08);
+      }
+      100% {
+        /* Dinlenme pozisyonuna dönüş */
+        transform: rotate(-10deg) translate(0px, 0px) scale(1.0);
+      }
+    }
+
+    /* MASA SARSINTI EFEKTİ (SCREEN SHAKE ON IMPACT) */
+    .desk-shaking {
+      animation: deskImpactShake 0.22s ease-out;
+    }
+
+    @keyframes deskImpactShake {
+      0% { transform: translateY(0px); }
+      25% { transform: translateY(5px); }
+      50% { transform: translateY(-3px); }
+      75% { transform: translateY(2px); }
+      100% { transform: translateY(0px); }
+    }
+
+    /* GATE FLASH FEEDBACK */
+    .gate-flash {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 20;
+    }
+
+    .gate-flash.approved {
+      background: radial-gradient(circle, rgba(46, 204, 113, 0.35) 0%, rgba(0,0,0,0) 70%);
+      opacity: 1;
+    }
+
+    .gate-flash.rejected {
+      background: radial-gradient(circle, rgba(231, 76, 60, 0.45) 0%, rgba(0,0,0,0) 70%);
+      opacity: 1;
+    }
+
+    /* LOWER SECTION: KULÜBE İÇİ AHŞAP GÜVENLİK MASASI */
+    #desk-stage {
+      height: 48%;
+      position: relative;
+      background: linear-gradient(180deg, #4a3a30 0%, #5d473a 16%, #6b5346 58%, #725a4d 100%);
+      box-shadow: inset 0 14px 26px rgba(0, 0, 0, 0.55), inset 0 -12px 24px rgba(0, 0, 0, 0.22);
+      display: flex;
+      padding: 14px 28px;
+      gap: 24px;
+      z-index: 30;
+      align-items: center;
+      justify-content: center;
+      will-change: transform;
+    }
+
+    /* Yeşil keçe altlık (kart bölgesinin altında) */
+    .desk-mat-clean {
+      position: absolute;
+      top: 12px;
+      bottom: 12px;
+      left: 24px;
+      width: calc((100% - 80px) * 0.585 + 8px);
+      background: linear-gradient(145deg, #40594a 0%, #34503f 100%);
+      border: 2px solid #26392e;
+      border-radius: 8px;
+      box-shadow: inset 0 2px 10px rgba(0,0,0,0.4), 0 6px 14px rgba(0,0,0,0.35);
+      pointer-events: none;
+    }
+
+    /* ---------- MASA ÜSTÜ EŞYALARI (derinlik için; kartların ve butonların ALTINDA kalır) ---------- */
+    .desk-props {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 35;
+    }
+
+    .prop { position: absolute; }
+
+    /* Kontrol evrakları: kıskaçlı pano */
+    .prop-clipboard {
+      left: 1.2%;
+      top: 10px;
+      width: 88px;
+      height: 112px;
+      background: #8a6a48;
+      border: 2px solid #4d3822;
+      border-radius: 5px;
+      transform: rotate(-7deg);
+      box-shadow: 3px 5px 8px rgba(0,0,0,0.45);
+    }
+    .prop-clipboard::before {
+      content: '';
+      position: absolute;
+      top: -7px; left: 28px;
+      width: 28px; height: 12px;
+      background: #b8c2c8;
+      border: 2px solid #5b676e;
+      border-radius: 3px;
+    }
+    .prop-clipboard .paper {
+      position: absolute;
+      top: 10px; left: 7px; right: 7px; bottom: 8px;
+      background: #f3efe4;
+      border-radius: 2px;
+      padding: 12px 6px 6px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .prop-clipboard .paper i { display: block; height: 3px; background: #9aa3a8; border-radius: 2px; }
+    .prop-clipboard .paper i:nth-child(2) { width: 70%; }
+    .prop-clipboard .paper i:nth-child(4) { width: 55%; background: #b34a3d; }
+
+    /* Kalemlik */
+    .prop-pencup {
+      left: 9.6%;
+      top: 8px;
+      width: 30px;
+      height: 40px;
+      background: linear-gradient(90deg, #2b3a44, #4a5d6a 50%, #2b3a44);
+      border: 2px solid #1a252d;
+      border-radius: 3px 3px 7px 7px;
+      box-shadow: 2px 4px 6px rgba(0,0,0,0.45);
+    }
+    .prop-pencup i {
+      position: absolute; bottom: 30px; width: 4px; height: 24px; border-radius: 2px;
+    }
+    .prop-pencup i:nth-child(1) { left: 4px;  background: #c0392b; transform: rotate(-12deg); }
+    .prop-pencup i:nth-child(2) { left: 11px; background: #2c6fbb; transform: rotate(2deg); }
+    .prop-pencup i:nth-child(3) { left: 18px; background: #e0b030; transform: rotate(14deg); }
+
+    /* Mühür ıstampaları (kırmızı + yeşil mürekkep) */
+    .prop-inkpads {
+      left: 24%;
+      bottom: 8px;
+      display: flex;
+      gap: 8px;
+    }
+    .prop-inkpads span {
+      display: block;
+      width: 60px; height: 26px;
+      background: #2c3238;
+      border: 2px solid #12161a;
+      border-radius: 5px;
+      position: relative;
+      box-shadow: 2px 4px 6px rgba(0,0,0,0.5);
+    }
+    .prop-inkpads span::after {
+      content: '';
+      position: absolute; inset: 3px;
+      border-radius: 3px;
+    }
+    .prop-inkpads span:nth-child(1)::after { background: #b83228; }
+    .prop-inkpads span:nth-child(2)::after { background: #2a9a55; }
+
+    /* Çay bardağı (tarihi Beyazıt mola klasiği) */
+    .prop-tea {
+      left: 41%;
+      bottom: 8px;
+      width: 24px;
+      height: 28px;
+      background: linear-gradient(180deg, #a5481f 0%, #8a3a14 100%);
+      border: 2px solid #f1e3cf;
+      border-radius: 4px 4px 9px 9px;
+      box-shadow: 2px 4px 6px rgba(0,0,0,0.45);
+    }
+    .prop-tea::before {
+      content: '';
+      position: absolute; top: -14px; left: -4px;
+      width: 28px; height: 16px;
+      background: radial-gradient(ellipse at center, #f7efe3 0%, #e7d8c2 100%);
+      border-radius: 50% 50% 0 0;
+      opacity: 0.0;
+    }
+    .prop-tea::after {
+      content: '';
+      position: absolute; right: -11px; top: 4px;
+      width: 9px; height: 14px;
+      border: 2px solid #f1e3cf;
+      border-left: none;
+      border-radius: 0 8px 8px 0;
+    }
+
+    /* Telsiz */
+    .prop-radio {
+      right: 3%;
+      bottom: 6px;
+      width: 26px;
+      height: 58px;
+      background: linear-gradient(90deg, #14191d, #2b343a 50%, #14191d);
+      border: 2px solid #090c0e;
+      border-radius: 5px;
+      transform: rotate(8deg);
+      box-shadow: 3px 5px 8px rgba(0,0,0,0.5);
+    }
+    .prop-radio::before {
+      content: '';
+      position: absolute; top: -24px; right: 4px;
+      width: 4px; height: 24px;
+      background: #0d1114;
+      border-radius: 2px;
+    }
+    .prop-radio::after {
+      content: '';
+      position: absolute; top: 8px; left: 5px;
+      width: 12px; height: 9px;
+      background: #3fae6a;
+      border-radius: 2px;
+      box-shadow: 0 0 6px rgba(63, 174, 106, 0.7);
+    }
+
+    /* Görevli isimliği */
+    .prop-nameplate {
+      right: 6%;
+      top: 8px;
+      padding: 3px 14px;
+      background: linear-gradient(180deg, #d8bf7a, #a98a3e);
+      border: 2px solid #5d4916;
+      border-radius: 3px;
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      color: #2e2308;
+      box-shadow: 2px 4px 6px rgba(0,0,0,0.45);
+      white-space: nowrap;
+    }
+
+    /* LEFT DESK AREA: ÖĞRENCİ KİMLİK KARTI */
+    .desk-card-zone {
+      position: relative;
+      flex: 1.2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 40;
+    }
+
+    .card-drop-label {
+      position: absolute;
+      top: -12px;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: #f0e4d2;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    /* İÜ ÖĞRENCİ KİMLİK KARTI */
+    #id-card {
+      width: 440px;
+      height: 250px;
+      background: linear-gradient(135deg, #0c233c 0%, #081728 50%, #05101c 100%);
+      border: 3px solid #d4af37;
+      border-radius: 12px;
+      box-shadow: 0 14px 34px rgba(0,0,0,0.85), inset 0 0 15px rgba(212, 175, 55, 0.12);
+      position: relative;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: #fff;
+      cursor: pointer;
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s;
+    }
+
+    #id-card:hover {
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.95), 0 0 20px rgba(212, 175, 55, 0.35);
+    }
+
+    .card-inspect-hint {
+      position: absolute;
+      top: -11px;
+      right: 14px;
+      background: #d4af37;
+      color: #0c1a24;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      pointer-events: none;
+      transition: transform 0.2s;
+    }
+
+    #id-card:hover .card-inspect-hint {
+      transform: scale(1.08);
+      background: #f1c40f;
+    }
+
+    /* CARD HEADER */
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #d4af37;
+      padding-bottom: 6px;
+    }
+
+    .card-header-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-title-tr {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: #f7e6a2;
+    }
+
+    .card-title-sub {
+      font-size: 9px;
+      color: #a7c1dd;
+      letter-spacing: 1px;
+      margin-top: 2px;
+      font-weight: 600;
+    }
+
+    .card-header-logo {
+      width: 44px;
+      height: 44px;
+      object-fit: contain;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    }
+
+    /* CARD BODY */
+    .card-body {
+      display: flex;
+      gap: 16px;
+      margin-top: 6px;
+      flex: 1;
+      position: relative;
+    }
+
+    .card-photo-wrapper {
+      width: 100px;
+      height: 120px;
+      background: #ece9db;
+      border: 2px solid #d4af37;
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+
+    #card-photo-canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    .card-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+      color: #e5effa;
+    }
+
+    .info-row {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .info-title {
+      font-size: 9px;
+      color: #9cb2c9;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      font-weight: 600;
+    }
+
+    .info-data {
+      font-size: 12px;
+      font-weight: 700;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+
+    /* CARD FOOTER */
+    .card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      border-top: 1px solid rgba(212, 175, 55, 0.4);
+      padding-top: 4px;
+      margin-top: 4px;
+    }
+
+    .barcode-line {
+      font-size: 14px;
+      letter-spacing: 4px;
+      color: #f7e6a2;
+      opacity: 0.85;
+      font-weight: bold;
+    }
+
+    .card-expiry-badge {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .expiry-label {
+      font-size: 8px;
+      color: #9cb2c9;
+      font-weight: 600;
+    }
+
+    .expiry-date {
+      font-size: 12px;
+      font-weight: 800;
+      color: #ffdf79;
+    }
+
+    /* CARD STAMP / REKTORLUK SEAL */
+    .card-seal-container {
+      position: absolute;
+      right: 12px;
+      bottom: 24px;
+      width: 74px;
+      height: 74px;
+      pointer-events: none;
+    }
+
+    .card-seal {
+      width: 100%;
+      height: 100%;
+      border: 2px dashed #c0392b;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #c0392b;
+      text-align: center;
+      font-size: 7px;
+      font-weight: 800;
+      transform: rotate(-15deg);
+      opacity: 0.85;
+      box-shadow: inset 0 0 5px rgba(192, 57, 43, 0.3);
+      background: radial-gradient(circle, rgba(192,57,43,0.06) 0%, transparent 80%);
+    }
+
+    .card-seal.fake-seal {
+      border-color: #888;
+      color: #888;
+      font-style: italic;
+      opacity: 0.4;
+    }
+
+    .card-seal.missing {
+      display: none;
+    }
+
+    /* DECISION STAMPS */
+    .card-decision-stamp {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-12deg) scale(0.6);
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      padding: 8px 24px;
+      border: 5px solid;
+      border-radius: 8px;
+      text-transform: uppercase;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 100;
+    }
+
+    .card-decision-stamp.approved {
+      color: #2ecc71;
+      border-color: #2ecc71;
+      background: rgba(46, 204, 113, 0.18);
+      box-shadow: 0 0 25px rgba(46, 204, 113, 0.6);
+      opacity: 0.95;
+      transform: translate(-50%, -50%) rotate(-10deg) scale(1);
+    }
+
+    .card-decision-stamp.rejected {
+      color: #e74c3c;
+      border-color: #e74c3c;
+      background: rgba(231, 76, 60, 0.2);
+      box-shadow: 0 0 25px rgba(231, 76, 60, 0.6);
+      opacity: 0.95;
+      transform: translate(-50%, -50%) rotate(12deg) scale(1);
+    }
+
+    /* RIGHT DESK AREA: TALİMAT NOT KAĞIDI & KONTROL BUTONLARI */
+    .desk-controls-zone {
+      flex: 0.85;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      z-index: 40;
+    }
+
+    /* TALİMAT NOT KAĞIDI */
+    .desk-memo-clean {
+      background: #faf6eb;
+      color: #1a1a24;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+      border-left: 5px solid #d4af37;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s;
+    }
+
+    .desk-memo-clean:hover {
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.65), 0 0 12px rgba(212, 175, 55, 0.35);
+    }
+
+    .desk-memo-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #e0d5be;
+      padding-bottom: 4px;
+      margin-bottom: 2px;
+    }
+
+    .desk-memo-title {
+      font-weight: 800;
+      font-size: 11px;
+      color: #8c261e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .desk-memo-badge {
+      font-size: 9px;
+      background: #8c261e;
+      color: #ffffff;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 700;
+    }
+
+    .desk-memo-item {
+      color: #242c30;
+      font-size: 11px;
+      line-height: 1.4;
+      font-weight: 600;
+    }
+
+    .desk-memo-click-hint {
+      font-size: 10px;
+      color: #8c261e;
+      text-align: right;
+      font-weight: 700;
+      margin-top: 3px;
+      letter-spacing: 0.5px;
+    }
+
+    /* KONTROL PANELİ & BUTONLAR */
+    .control-panel {
+      background: #182024;
+      border: 1px solid #2e3d45;
+      border-radius: 6px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+    }
+
+    .panel-header-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #7b98a3;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border-bottom: 1px solid #263339;
+      padding-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .control-buttons-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .stamp-btn {
+      flex: 1;
+      height: 66px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      border: none;
+      box-shadow: 0 5px 0 #000, 0 8px 15px rgba(0,0,0,0.6);
+      transition: transform 0.1s, box-shadow 0.1s, filter 0.2s;
+    }
+
+    .stamp-btn:active {
+      transform: translateY(4px);
+      box-shadow: 0 1px 0 #000, 0 4px 8px rgba(0,0,0,0.8);
+    }
+
+    .stamp-btn .hotkey {
+      font-size: 10px;
+      opacity: 0.9;
+      font-weight: 600;
+      background: rgba(0,0,0,0.25);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    .btn-approve {
+      background: linear-gradient(to bottom, #2ecc71 0%, #27ae60 100%);
+      color: #082914;
+      border-top: 2px solid #58d68d;
+    }
+
+    .btn-approve:hover {
+      filter: brightness(1.1);
+    }
+
+    .btn-reject {
+      background: linear-gradient(to bottom, #e74c3c 0%, #c0392b 100%);
+      color: #3b0d09;
+      border-top: 2px solid #ec7063;
+    }
+
+    .btn-reject:hover {
+      filter: brightness(1.1);
+    }
+
+    /* FEEDBACK TOAST BANNER */
+    #feedback-banner {
+      position: absolute;
+      top: 56px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #10161a;
+      border: 2px solid #3c4f58;
+      padding: 9px 20px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      z-index: 80;
+      color: #ffffff;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.85);
+      pointer-events: none;
+      opacity: 0;
+      transition: all 0.25s ease;
+      text-align: center;
+      max-width: 80%;
+    }
+
+    #feedback-banner.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(6px);
+    }
+
+    #feedback-banner.success {
+      border-color: #2ecc71;
+      color: #a9dfbf;
+      background: #0d2818;
+    }
+
+    #feedback-banner.error {
+      border-color: #e74c3c;
+      color: #f5b7b1;
+      background: #331310;
+    }
+
+    /* ==========================================================================
+       MODAL PENCERELERİ: İNCELEME MODU, GÖREV TALİMATI & RAPOR
+       ========================================================================== */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(4, 7, 10, 0.88);
+      z-index: 900;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(5px);
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    /* ==========================================================================
+       YENİ: KİMLİK KARTI İNCELEME MODU (ZOOM + PROTOKOL PANELİ)
+       ========================================================================== */
+    .inspect-modal-box {
+      width: 980px;
+      max-width: 96%;
+      background: #141c20;
+      border: 3px solid #455a64;
+      border-radius: 12px;
+      padding: 24px 28px;
+      box-shadow: 0 25px 70px rgba(0,0,0,0.95), 0 0 30px rgba(69, 90, 100, 0.3);
+      position: relative;
+      display: flex;
+      gap: 26px;
+      color: #e6edf3;
+    }
+
+    .inspect-col-card {
+      flex: 1.15;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #0c1215;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #233137;
+    }
+
+    .inspect-col-title {
+      font-size: 11px;
+      color: #d4af37;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+
+    .inspect-col-guide {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    /* SADELEŞTİRİLMİŞ PROTOKOL KARTLARI */
+    .proto-guide-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .proto-item {
+      background: #0f1619;
+      border: 1px solid #29383f;
+      border-left: 4px solid #2ecc71;
+      border-radius: 6px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .proto-item.danger-left {
+      border-left-color: #e74c3c;
+    }
+
+    .proto-item.warn-left {
+      border-left-color: #f1c40f;
+    }
+
+    .proto-item.info-left {
+      border-left-color: #3498db;
+    }
+
+    .proto-item-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    .proto-item-desc {
+      font-size: 11.5px;
+      line-height: 1.45;
+      color: #c4d3da;
+    }
+
+    .proto-item-desc em {
+      color: #85c1e9;
+      font-style: normal;
+      font-weight: 600;
+    }
+
+    .badge-reject-tag {
+      background: #441818;
+      color: #ff8585;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-weight: 800;
+    }
+
+    /* İNCELEME MODUNDAKİ BUTONLAR */
+    .inspect-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .inspect-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: filter 0.2s, transform 0.1s;
+    }
+
+    .inspect-btn:hover { filter: brightness(1.1); }
+    .inspect-btn:active { transform: translateY(2px); }
+
+    .inspect-btn-approve {
+      background: #27ae60;
+      color: #ffffff;
+    }
+
+    .inspect-btn-reject {
+      background: #c0392b;
+      color: #ffffff;
+    }
+
+    .inspect-btn-close {
+      background: #37474f;
+      color: #eceff1;
+    }
+
+    /* DETAYLI GÖREV TALİMATNAMESİ MODAL PENCERESİ */
+    .rulebook-modal {
+      width: 680px;
+      max-width: 95%;
+      background: #fbf7ee;
+      color: #1a1a24;
+      border: 4px solid #4a3625;
+      border-radius: 8px;
+      padding: 24px 30px;
+      box-shadow: 0 25px 70px rgba(0,0,0,0.95);
+      position: relative;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .rulebook-header {
+      text-align: center;
+      border-bottom: 2px solid #8c261e;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .rulebook-header h2 {
+      font-size: 19px;
+      color: #8c261e;
+      letter-spacing: 1px;
+      font-weight: 800;
+    }
+
+    .rulebook-header p {
+      font-size: 11px;
+      color: #555555;
+      margin-top: 3px;
+      font-weight: 600;
+    }
+
+    .modal-close-icon {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: #8c261e;
+      color: #ffffff;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .modal-close-icon:hover {
+      background: #ad2e24;
+      transform: scale(1.1);
+    }
+
+    .rulebook-clean-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .rulebook-card {
+      background: #ffffff;
+      border: 1px solid #dcd5c5;
+      border-left: 5px solid #8c261e;
+      border-radius: 6px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .rulebook-card-head {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: #0c233c;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .rulebook-card-body {
+      font-size: 12px;
+      color: #2c3e50;
+      line-height: 1.45;
+    }
+
+    .rulebook-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 18px;
+      border-top: 1px solid #dcd5c5;
+      padding-top: 14px;
+    }
+
+    .modal-close-btn {
+      background: #8c261e;
+      color: #ffffff;
+      border: none;
+      padding: 9px 22px;
+      font-family: inherit;
+      font-weight: 800;
+      font-size: 13px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .modal-close-btn:hover {
+      background: #a93226;
+    }
+
+    /* VARDİYA SONU MODALI */
+    .report-modal {
+      width: 500px;
+      max-width: 90%;
+      background: #141c20;
+      color: #e6edf3;
+      border: 3px solid #364952;
+      border-radius: 8px;
+      padding: 26px;
+      text-align: center;
+      box-shadow: 0 25px 70px rgba(0,0,0,0.95);
+    }
+
+    .report-title {
+      font-size: 22px;
+      margin-bottom: 8px;
+      letter-spacing: 2px;
+      font-weight: 800;
+    }
+
+    .report-title.game-over { color: #e74c3c; }
+    .report-title.shift-win { color: #2ecc71; }
+
+    .report-details {
+      background: #0b1013;
+      border: 1px solid #243238;
+      padding: 16px;
+      margin: 16px 0;
+      border-radius: 6px;
+      text-align: left;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .report-row {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 600;
+    }
+
+    .report-action-btn {
+      background: #27ae60;
+      color: #ffffff;
+      border: none;
+      padding: 11px 26px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      border-radius: 4px;
+      margin-top: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      transition: background 0.2s;
+    }
+
+    .report-action-btn:hover { background: #2ecc71; }
+
+    /* BAŞLANGIÇ EĞİTİM MODALI */
+    .tutorial-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(6, 10, 15, 0.92);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+      padding: 20px;
+    }
+
+    .tutorial-modal {
+      width: 760px;
+      max-width: 95%;
+      background: linear-gradient(165deg, #182330 0%, #0f1720 100%);
+      border: 1px solid #283a4c;
+      border-radius: 12px;
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      padding: 28px 32px;
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      animation: tutModalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes tutModalPop {
+      from { opacity: 0; transform: scale(0.96) translateY(6px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .tutorial-header {
+      text-align: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 16px;
+    }
+
+    .tut-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #f1c40f;
+      background: rgba(241, 196, 15, 0.12);
+      border: 1px solid rgba(241, 196, 15, 0.35);
+      padding: 3px 12px;
+      border-radius: 20px;
+      margin-bottom: 10px;
+    }
+
+    .tutorial-header h2 {
+      font-size: 24px;
+      color: #ffffff;
+      letter-spacing: 2px;
+      font-weight: 900;
+      margin: 0;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+    }
+
+    .tutorial-header p {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .tutorial-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .tutorial-card {
+      background: rgba(15, 23, 33, 0.85);
+      border: 1px solid #233446;
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border-left: 4px solid #38bdf8;
+      transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .tutorial-card:hover {
+      transform: translateY(-2px);
+      border-color: #3b526b;
+      background: rgba(21, 32, 46, 0.95);
+    }
+
+    .tutorial-card.card-id { border-left-color: #38bdf8; }
+    .tutorial-card.card-campus { border-left-color: #34d399; }
+    .tutorial-card.card-keys { border-left-color: #a78bfa; }
+    .tutorial-card.card-warning { border-left-color: #f87171; }
+
+    .tut-card-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+
+    .tut-card-desc {
+      font-size: 12px;
+      line-height: 1.55;
+      color: #cbd5e1;
+    }
+
+    .tutorial-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 16px;
+    }
+
+    .tut-footer-hint {
+      font-size: 12px;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-start-duty {
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+      color: #ffffff;
+      border: none;
+      padding: 12px 32px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      border-radius: 6px;
+      box-shadow: 0 4px 14px rgba(22, 163, 74, 0.35), 0 2px 0 #15803d;
+      transition: filter 0.15s, transform 0.1s, box-shadow 0.15s;
+    }
+
+    .btn-start-duty:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(22, 163, 74, 0.45), 0 2px 0 #15803d;
+    }
+
+    .btn-start-duty:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 4px rgba(22, 163, 74, 0.3);
+    }
+
+    /* FOOTER BAR */
+    footer.bottom-bar {
+      height: 28px;
+      background: #101518;
+      border-top: 1px solid #1e282d;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      font-size: 11px;
+      color: #78909c;
+    }
+
+    .key-badge {
+      background: #202b30;
+      color: #ffffff;
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid #3c4f58;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- STATUS BAR -->
+  <header class="status-bar">
+    <div class="status-left">
+      <div>
+        <span class="badge-label">Vardiya:</span>
+        <span class="badge-val" id="val-shift">1</span>
+      </div>
+      <div>
+        <span class="badge-label">Kişi:</span>
+        <span class="badge-val" id="val-student-count">1 / 10</span>
+      </div>
+      <div>
+        <span class="badge-label">Saat:</span>
+        <span class="badge-val" id="val-time">08:30</span>
+      </div>
+    </div>
+
+    <div class="status-center">
+      <div class="strikes-container" title="3 Hatalı Kararda Görevden Alınırsınız!">
+        <span class="badge-label" style="color: #ff6666;">İHTAR:</span>
+        <div class="strike-lamp" id="strike-1"></div>
+        <div class="strike-lamp" id="strike-2"></div>
+        <div class="strike-lamp" id="strike-3"></div>
+      </div>
+    </div>
+
+    <div class="status-right">
+      <div>
+        <span class="badge-label">Puan / Bütçe:</span>
+        <span class="badge-val" id="val-score" style="color: #6fe7a2;">0 ₺</span>
+      </div>
+      <button class="header-btn" id="btn-open-rules">📖 PROTOKOL (B)</button>
+      <button class="header-btn" id="btn-sound-toggle">🔊 SES: AÇIK</button>
+    </div>
+  </header>
+
+  <!-- GAME VIEWPORT -->
+  <main id="game-viewport">
+    <!-- GATE STAGE: İSTANBUL ÜNİVERSİTESİ TARİHİ BEYAZIT KAPISI (TAM EKRAN GENİŞLİK) -->
+    <section id="gate-stage">
+      <!-- DIŞ MANZARA: Beyazıt Tarihi Kapısı (Sağdan ve Soldan Sıfırlanmış Tam Ekran) -->
+      <div class="gate-bg-wrapper">
+        <img src="images/kapi.new.jpg" onerror="this.onerror=null; this.src='images/kapi.new';" alt="İstanbul Üniversitesi Beyazıt Tarihi Kapısı" class="gate-bg-img">
+        <div class="gate-bg-overlay"></div>
+      </div>
+
+      <div class="gate-flash" id="gate-flash"></div>
+
+      <!-- KAPI KEMERİNDEN DOĞRUDAN MASAYA GELEN ÖĞRENCİ KARAKTERİ -->
+      <div id="student-container">
+        <div class="student-ground-shadow"></div>
+        <canvas id="student-canvas" width="240" height="280"></canvas>
+        <div class="speech-bubble" id="speech-bubble">İyi günler memur bey.</div>
+      </div>
+
+      <!-- KULÜBE TAVAN KİRİŞİ & CAM AYDINLATMASI -->
+      <div class="booth-frame" aria-hidden="true">
+        <div class="booth-glass"></div>
+        <div class="booth-ceiling">
+          <span class="booth-lamp"></span>
+          <span class="booth-plate">İ.Ü. Güvenlik · Nöbet Kulübesi</span>
+        </div>
+      </div>
+
+      <div id="feedback-banner"></div>
+    </section>
+
+    <!-- DESK STAGE: TEMİZ GÜVENLİK MASASI -->
+    <section id="desk-stage">
+      <div class="desk-mat-clean"></div>
+
+      <!-- MASA ÜSTÜ EŞYALARI: kontrol evrakları, kalemlik, mühür ıstampaları, çay, telsiz, isimlik -->
+      <div class="desk-props" aria-hidden="true">
+        <div class="prop prop-clipboard"><div class="paper"><i></i><i></i><i></i><i></i><i></i></div></div>
+        <div class="prop prop-pencup"><i></i><i></i><i></i></div>
+        <div class="prop prop-inkpads"><span></span><span></span></div>
+        <div class="prop prop-tea"></div>
+        <div class="prop prop-radio"></div>
+        <div class="prop prop-nameplate">GÜVENLİK GÖREVLİSİ</div>
+      </div>
+
+      <!-- STUDENT ID CARD ZONE -->
+      <div class="desk-card-zone">
+        <div class="card-drop-label">KONTROL MASASI // ÖĞRENCİ KİMLİK KARTI</div>
+        
+        <div id="id-card" title="Kartı Büyütüp İncelemek İçin Tıklayın">
+          <span class="card-inspect-hint">🔍 TIKLA: İNCELE</span>
+          <!-- CARD HEADER -->
+          <div class="card-header">
+            <div class="card-header-text">
+              <span class="card-title-tr">T.C. İSTANBUL ÜNİVERSİTESİ</span>
+              <span class="card-title-sub">ÖĞRENCİ KİMLİK KARTI / STUDENT ID</span>
+            </div>
+            <img src="images/iu-logo.png" onerror="this.src='images/iu-logo.png.png'" alt="İÜ Logo" class="card-header-logo">
+          </div>
+
+          <!-- CARD BODY -->
+          <div class="card-body">
+            <div class="card-photo-wrapper">
+              <canvas id="card-photo-canvas" width="140" height="170"></canvas>
+            </div>
+
+            <div class="card-info">
+              <div class="info-row">
+                <span class="info-title">Adı Soyadı:</span>
+                <span class="info-data" id="card-name">-</span>
+              </div>
+              <div class="info-row">
+                <span class="info-title">Öğrenci No:</span>
+                <span class="info-data" id="card-no">-</span>
+              </div>
+              <div class="info-row">
+                <span class="info-title">Fakülte / Bölüm:</span>
+                <span class="info-data" id="card-faculty">-</span>
+              </div>
+              <div class="info-row">
+                <span class="info-title">T.C. Kimlik / Seri:</span>
+                <span class="info-data" id="card-serial">IU-2026-X892</span>
+              </div>
+            </div>
+
+            <div class="card-seal-container">
+              <div class="card-seal" id="card-seal">
+                <span>T.C. İSTANBUL ÜNİV.</span>
+                <span style="font-size:9px;">★ REKTÖRLÜK ★</span>
+                <span>MÜHRÜ</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD FOOTER -->
+          <div class="card-footer">
+            <div class="barcode-line">||| ||||| || |||||||</div>
+            <div class="card-expiry-badge">
+              <span class="expiry-label">SON GEÇERLİLİK:</span>
+              <span class="expiry-date" id="card-expiry">30.09.2026</span>
+            </div>
+          </div>
+
+          <div class="card-decision-stamp" id="card-stamp">GEÇTİ</div>
+        </div>
+      </div>
+
+      <!-- DESK CONTROLS ZONE -->
+      <div class="desk-controls-zone">
+        <!-- TALİMAT NOT KAĞIDI -->
+        <div class="desk-memo-clean" id="desk-memo-card" title="Detaylı Görev Talimatını İncelemek İçin Tıklayın">
+          <div class="desk-memo-head">
+            <span class="desk-memo-title">📌 BEYAZIT KAPI TALİMATI (2026)</span>
+            <span class="desk-memo-badge">MEVZUAT</span>
+          </div>
+          <div class="desk-memo-item">📅 En az 2026 geçerli (2025 ve öncesi RET)</div>
+          <div class="desk-memo-item">🏛️ Sadece Beyazıt kampüsü birimleri kabul</div>
+          <div class="desk-memo-item">👤 Yüz, saç, sakal ve gözlük fotoğrafla uyuşmalı</div>
+          <div class="desk-memo-click-hint">🔍 [ Tıkla & Talimatnamesi Aç ↗ ]</div>
+        </div>
+
+        <!-- KARAR MEKANİZMASI -->
+        <div class="control-panel">
+          <div class="panel-header-title">
+            <span>KARAR MEKANİZMASI</span>
+            <span>GİRİŞ KONTROLÜ</span>
+          </div>
+          <div class="control-buttons-row">
+            <button class="stamp-btn btn-reject" id="btn-reject" title="Girişi Reddet (Klavye: A veya Sol Ok)">
+              <span>REDDET</span>
+              <span class="hotkey">[A / ←]</span>
+            </button>
+            <button class="stamp-btn btn-approve" id="btn-approve" title="Girişi Onayla (Klavye: D veya Sağ Ok)">
+              <span>ONAYLA</span>
+              <span class="hotkey">[D / →]</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- GÜVENLİK GÖREVLİSİ KOLLARI VE DAMGA -->
+      <div class="guard-arms-overlay">
+        <!-- SOL KOL: Masada dinlenen kol, Türk Bayrağı armalı üniforma -->
+        <div class="guard-arm-left" id="guard-arm-left">
+          <div class="arm-sleeve-left">
+            <div class="guard-patch">
+              <span class="guard-patch-flag">🇹🇷</span>
+              <span class="guard-patch-text">GÜVENLİK</span>
+            </div>
+          </div>
+          <div class="guard-hand-left"></div>
+        </div>
+
+        <!-- SAĞ KOL: Damgayı tutan ve karar verildiğinde karta vuran kol -->
+        <div class="guard-arm-right" id="guard-arm-right">
+          <div class="arm-sleeve-right">
+            <div class="guard-patch-right">
+              <span>İÜ-KORUMA</span>
+            </div>
+          </div>
+          <div class="guard-hand-right">
+            <div class="held-stamp" id="held-stamp">
+              <div class="held-stamp-knob"></div>
+              <div class="held-stamp-shaft"></div>
+              <div class="held-stamp-base" id="held-stamp-base"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- BOTTOM FOOTER -->
+  <footer class="bottom-bar">
+    <div>İ.Ü. Güvenlik ve Koruma Şube Müdürlüğü — Beyazıt Ana Kapı Kontrol Noktası</div>
+    <div>Kısayollar: <span class="key-badge">D / →</span> Onayla | <span class="key-badge">A / ←</span> Reddet | <span class="key-badge">B</span> Protokol | <span class="key-badge">Esc</span> Kapat / Masaya Dön</div>
+  </footer>
+
+  <!-- ==========================================================================
+       MODAL 1: KİMLİK KARTI İNCELEME MODU (BÜYÜTÜLMÜŞ KART + HIZLI PROTOKOL REHBERİ)
+       ========================================================================== -->
+  <div class="modal-overlay" id="inspect-modal">
+    <div class="inspect-modal-box">
+      <button class="modal-close-icon" id="btn-close-inspect-icon" title="Kapat (Esc)">✕</button>
+
+      <!-- SOL KOLON: BÜYÜTÜLMÜŞ KİMLİK KARTI -->
+      <div class="inspect-col-card">
+        <div class="inspect-col-title">🔍 KİMLİK KARTI YAKIN ÇEKİM İNCELEME</div>
+        
+        <div id="inspect-card-clone" style="width: 480px; height: 275px; background: linear-gradient(135deg, #0c233c 0%, #081728 50%, #05101c 100%); border: 3px solid #d4af37; border-radius: 12px; box-shadow: 0 15px 35px rgba(0,0,0,0.85); padding: 14px 18px; display: flex; flex-direction: column; justify-content: space-between; position: relative;">
+          <!-- Header -->
+          <div class="card-header">
+            <div class="card-header-text">
+              <span class="card-title-tr" style="font-size:14px;">T.C. İSTANBUL ÜNİVERSİTESİ</span>
+              <span class="card-title-sub" style="font-size:10px;">ÖĞRENCİ KİMLİK KARTI / STUDENT ID</span>
+            </div>
+            <img src="images/iu-logo.png" onerror="this.src='images/iu-logo.png.png'" alt="İÜ Logo" class="card-header-logo" style="width:48px; height:48px;">
+          </div>
+          <!-- Body -->
+          <div class="card-body">
+            <div class="card-photo-wrapper" style="width:115px; height:138px;">
+              <canvas id="inspect-photo-canvas" width="140" height="170"></canvas>
+            </div>
+            <div class="card-info" style="gap:7px;">
+              <div class="info-row">
+                <span class="info-title">Adı Soyadı:</span>
+                <span class="info-data" id="inspect-name" style="font-size:13px;">-</span>
+              </div>
+              <div class="info-row">
+                <span class="info-title">Öğrenci No:</span>
+                <span class="info-data" id="inspect-no" style="font-size:13px; color:#ffdf79;">-</span>
+              </div>
+              <div class="info-row">
+                <span class="info-title">Fakülte / Bölüm:</span>
+                <span class="info-data" id="inspect-faculty" style="font-size:13px;">-</span>
+              </div>
+              <div class="info-row">
+                <span class="info-title">Seri No:</span>
+                <span class="info-data" style="font-size:11px; color:#8fa0a8;">IU-2026-X892</span>
+              </div>
+            </div>
+            <div class="card-seal-container" style="right:12px; bottom:26px;">
+              <div class="card-seal" id="inspect-seal" style="width:78px; height:78px;">
+                <span>T.C. İSTANBUL ÜNİV.</span>
+                <span style="font-size:9px;">★ REKTÖRLÜK ★</span>
+                <span>MÜHRÜ</span>
+              </div>
+            </div>
+          </div>
+          <!-- Footer -->
+          <div class="card-footer">
+            <div class="barcode-line">||| ||||| || |||||||</div>
+            <div class="card-expiry-badge">
+              <span class="expiry-label">SON GEÇERLİLİK:</span>
+              <span class="expiry-date" id="inspect-expiry" style="font-size:13px; color:#ffd700;">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SAĞ KOLON: 4 MADDELİK HIZLI PROTOKOL REHBERİ -->
+      <div class="inspect-col-guide">
+        <div style="border-bottom: 2px solid #2f4048; padding-bottom: 6px;">
+          <h3 style="font-size:15px; color:#6fe7a2; letter-spacing:1px; display:flex; align-items:center; gap:8px;">
+            <span>📋 HIZLI PROTOKOL REHBERİ</span>
+          </h3>
+          <p style="font-size:11px; color:#8fa0a8; margin-top:2px;">Göz ucuyla kart bilgilerini maddelerle eşleştirin:</p>
+        </div>
+
+        <div class="proto-guide-list">
+          <!-- 1. MADDE: TARİH -->
+          <div class="proto-item info-left">
+            <div class="proto-item-head">
+              <span>📅 1. Geçerlilik Yılı</span>
+            </div>
+            <div class="proto-item-desc">
+              Kart en az <strong>2026 ve sonrası</strong> olmalıdır.<br>
+              <span class="badge-reject-tag">2025 ve öncesi ❌ RET</span>
+            </div>
+          </div>
+
+          <!-- 2. MADDE: FAKÜLTE -->
+          <div class="proto-item warn-left">
+            <div class="proto-item-head">
+              <span>🏛️ 2. Yetkili Kampüs</span>
+            </div>
+            <div class="proto-item-desc">
+              Sadece Beyazıt birimleri girebilir (<em>Hukuk, İktisat, SBF, İletişim, Edebiyat, Fen, Eczacılık, Su Bilimleri</em>).<br>
+              <span class="badge-reject-tag">Avcılar/İÜC (Tıp, Müh, Orman) ❌ RET</span>
+            </div>
+          </div>
+
+          <!-- 3. MADDE: EŞKAL -->
+          <div class="proto-item danger-left">
+            <div class="proto-item-head">
+              <span>👤 3. Eşkâl & Fotoğraf</span>
+            </div>
+            <div class="proto-item-desc">
+              Kişinin saç rengi/modeli, sakalı ve gözlük durumu karttaki fotoğrafla <strong>BİREBİR</strong> uyuşmalıdır. Uyuşmazsa ❌ RET
+            </div>
+          </div>
+
+          <!-- 4. MADDE: MÜHÜR & NO -->
+          <div class="proto-item">
+            <div class="proto-item-head">
+              <span>🔴 4. Mühür & No</span>
+            </div>
+            <div class="proto-item-desc">
+              Resmi kırmızı Rektörlük Mührü bulunmalı, öğrenci numarası tam <strong>10 haneli rakam</strong> olmalıdır.
+            </div>
+          </div>
+        </div>
+
+        <!-- HIZLI KARAR BUTONLARI -->
+        <div class="inspect-actions">
+          <button class="inspect-btn inspect-btn-reject" id="btn-inspect-reject">
+            <span>REDDET [A]</span>
+          </button>
+          <button class="inspect-btn inspect-btn-approve" id="btn-inspect-approve">
+            <span>ONAYLA [D]</span>
+          </button>
+          <button class="inspect-btn inspect-btn-close" id="btn-inspect-close">
+            <span>MASAYA DÖN</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL 2: DETAYLI GÖREV TALİMATNAMESİ (SADE, FERAH, NET)
+       ========================================================================== -->
+  <div class="modal-overlay" id="rules-modal">
+    <div class="rulebook-modal">
+      <button class="modal-close-icon" id="btn-close-rules-icon" title="Kapat (Esc)">✕</button>
+      
+      <div class="rulebook-header">
+        <h2>T.C. İSTANBUL ÜNİVERSİTESİ</h2>
+        <p>BEYAZIT YERLEŞKESİ GÜVENLİK GÖREV TALİMATNAMESİ (2026)</p>
+      </div>
+
+      <div class="rulebook-clean-list">
+        <!-- 1 -->
+        <div class="rulebook-card">
+          <div class="rulebook-card-head">
+            <span>📅 1. Geçerlilik Yılı</span>
+          </div>
+          <div class="rulebook-card-body">
+            En az <strong>2026 yılı veya sonrası</strong> olmalıdır (30.09.2026, 2027, 2028). 2023, 2024 ve 2025 tarihli süresi geçmiş kartlar <strong style="color:#c0392b;">KESİNLİKLE RET</strong> edilmelidir.
+          </div>
+        </div>
+
+        <!-- 2 -->
+        <div class="rulebook-card">
+          <div class="rulebook-card-head">
+            <span>🏛️ 2. Yetkili Kampüs Birimleri</span>
+          </div>
+          <div class="rulebook-card-body">
+            Sadece Beyazıt ve tarihi yerleşke birimleri geçerlidir:<br>
+            <strong>Hukuk, İktisat, Siyasal Bilgiler (SBF), İletişim, Edebiyat, Fen, Eczacılık, Su Bilimleri.</strong><br>
+            <span style="color:#c0392b; font-weight:700;">⚠ Avcılar/İÜC birimleri (Cerrahpaşa Tıp, Mühendislik, Orman, Veteriner) Beyazıt kapısına ALINMAZ (RET).</span>
+          </div>
+        </div>
+
+        <!-- 3 -->
+        <div class="rulebook-card">
+          <div class="rulebook-card-head">
+            <span>👤 3. Eşkâl & Fotoğraf Kontrolü</span>
+          </div>
+          <div class="rulebook-card-body">
+            Kişinin saç rengi, saç stili, sakalı ve gözlük durumu karttaki vesikalık fotoğrafla <strong>BİREBİR uyuşmalıdır</strong>. Başkasının kartını kullananlar derhal <strong style="color:#c0392b;">RET</strong> edilmelidir.
+          </div>
+        </div>
+
+        <!-- 4 -->
+        <div class="rulebook-card">
+          <div class="rulebook-card-head">
+            <span>🔴 4. Mühür ve Numara Standardı</span>
+          </div>
+          <div class="rulebook-card-body">
+            Kartta kırmızı resmi <strong>Rektörlük Mührü</strong> yer almalıdır. Öğrenci numarası tam <strong>10 haneli rakam</strong> olmalıdır. Eksik mühür veya harf içeren sahte numaralar <strong style="color:#c0392b;">RET</strong> edilmelidir.
+          </div>
+        </div>
+      </div>
+
+      <div class="rulebook-footer">
+        <span style="font-size:11px; color:#555; font-weight:600;">⚠ 3 hatalı kararda göreviniz sonlandırılır.</span>
+        <button class="modal-close-btn" id="btn-close-rules">ANLADIM, GÖREVE DÖN</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TUTORIAL MODAL -->
+  <div class="tutorial-overlay" id="tutorial-modal">
+    <div class="tutorial-modal">
+      <div class="tutorial-header">
+        <div class="tut-badge">🛡️ KONTROL NOKTASI PROTOKOLÜ</div>
+        <h2>BEYAZIT KAPI NÖBETİ</h2>
+        <p>İstanbul Üniversitesi Beyazıt Kampüsü — Güvenlik Simülasyonu</p>
+      </div>
+
+      <div class="tutorial-grid">
+        <div class="tutorial-card card-id">
+          <div class="tut-card-head">👤 Eşkâl Kontrolü</div>
+          <div class="tut-card-desc">
+            Yüz, saç ve gözlük kimlikteki vesikalıkla birebir uymalıdır.
+          </div>
+        </div>
+
+        <div class="tutorial-card card-campus">
+          <div class="tut-card-head">📅 Tarih & Kampüs</div>
+          <div class="tut-card-desc">
+            Kart 2026+ olmalı; Beyazıt dışı birimler (Avcılar/Cerrahpaşa) giremez.
+          </div>
+        </div>
+
+        <div class="tutorial-card card-keys">
+          <div class="tut-card-head">⌨️ Hızlı Tuşlar</div>
+          <div class="tut-card-desc">
+            <kbd class="key-badge">D</kbd> Onayla &nbsp;•&nbsp; <kbd class="key-badge">A</kbd> Reddet &nbsp;•&nbsp; <kbd class="key-badge">B</kbd> Protokol Kitapçığı
+          </div>
+        </div>
+
+        <div class="tutorial-card card-warning">
+          <div class="tut-card-head">⚠️ Disiplin</div>
+          <div class="tut-card-desc">
+            Hatalı her karar 1 ihtar verir. 3 ihtarda kovulursun!
+          </div>
+        </div>
+      </div>
+
+      <div class="tutorial-footer">
+        <div class="tut-footer-hint">
+          <span>Başlamak için <kbd class="key-badge">Enter</kbd> tuşuna da basabilirsiniz.</span>
+        </div>
+        <button class="btn-start-duty" id="btn-start-duty">VARDİYAYA BAŞLA</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VARDİYA SONU / OYUN BİTTİ MODALI -->
+  <div class="modal-overlay" id="report-modal">
+    <div class="report-modal">
+      <h2 class="report-title" id="report-title">VARDİYA TAMAMLANDI</h2>
+      <div id="report-subtitle" style="font-size:13px; color:#aaa; margin-bottom:12px;">Günlük Görev Raporu</div>
+
+      <div class="report-details">
+        <div class="report-row">
+          <span>Kontrol Edilen Öğrenci:</span>
+          <strong id="rep-total">10</strong>
+        </div>
+        <div class="report-row">
+          <span>Doğru Kararlar:</span>
+          <strong id="rep-correct" style="color:#2ecc71;">0</strong>
+        </div>
+        <div class="report-row">
+          <span>Hatalı Kararlar (İhtarlar):</span>
+          <strong id="rep-strikes" style="color:#e74c3c;">0 / 3</strong>
+        </div>
+        <div class="report-row">
+          <span>Kazanılan Yevmiye:</span>
+          <strong id="rep-salary" style="color:#f1c40f;">0 ₺</strong>
+        </div>
+      </div>
+
+      <div id="report-message" style="font-size:12px; margin-bottom:15px; line-height: 1.4;"></div>
+
+      <button class="report-action-btn" id="btn-report-action">SONRAKİ VARDİYAYA GEÇ</button>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================================================
+       1. WEB AUDIO API: YALNIZCA ANLIK, HAFİF SES EFEKTLERİ (DAMGA / KABUL / RET / TIKLAMA)
+       ========================================================================== */
+    // GLOBAL AUDIOCONTEXT SINGLETON (SIFIR GC VE BELLEK TEKRARI)
+    const GLOBAL_AUDIO_CTX = window.__GLOBAL_AUDIO_CTX || (window.__GLOBAL_AUDIO_CTX = new (window.AudioContext || window.webkitAudioContext)());
+
+    class RetroAudio {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+        this.masterGain = null;
+        this.sharedNoiseBuffer = null;
+      }
+
+      init() {
+        if (!this.ctx) {
+          this.ctx = GLOBAL_AUDIO_CTX;
+          this.masterGain = this.ctx.createGain();
+          this.masterGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
+          this.masterGain.connect(this.ctx.destination);
+
+          // 2 SANİYELİK STATİK PAYLAŞIMLI GÜRÜLTÜ HAVUZU (SIFIR GC / BELLEK TEMİZLİĞİ)
+          const sampleRate = this.ctx.sampleRate || 44100;
+          const noiseLen = sampleRate * 2;
+          this.sharedNoiseBuffer = this.ctx.createBuffer(1, noiseLen, sampleRate);
+          const noiseData = this.sharedNoiseBuffer.getChannelData(0);
+          for (let i = 0; i < noiseLen; i++) {
+            noiseData[i] = Math.random() * 2 - 1;
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      toggle() {
+        this.enabled = !this.enabled;
+        if (this.enabled) this.init();
+        return this.enabled;
+      }
+
+      // Sürekli müzik / ses sentezi döngüsü KALDIRILDI: yalnızca ses motorunu kullanıcı etkileşimiyle uyandırır.
+      unlock() {
+        if (!this.enabled) return;
+        this.init();
+      }
+
+      // Anlık, hafif buton tıklama sesi
+      click() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(620, now);
+        gain.gain.setValueAtTime(0.07, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.045);
+      }
+
+      stamp(isApproved) {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = this.sharedNoiseBuffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(isApproved ? 800 : 450, now);
+
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.5, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(this.masterGain);
+        noise.start(now, Math.random() * 1.5, 0.12);
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(isApproved ? 140 : 80, now);
+        osc.frequency.exponentialRampToValueAtTime(30, now + 0.15);
+
+        gain.gain.setValueAtTime(0.7, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.15);
+      }
+
+      approve() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, now);
+        osc.frequency.setValueAtTime(783.99, now + 0.08);
+
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.28);
+      }
+
+      reject() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.setValueAtTime(110, now + 0.1);
+
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.35);
+      }
+
+      strike() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        
+        for (let i = 0; i < 2; i++) {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const start = now + i * 0.16;
+
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(880, start);
+          osc.frequency.exponentialRampToValueAtTime(440, start + 0.14);
+
+          gain.gain.setValueAtTime(0.4, start);
+          gain.gain.exponentialRampToValueAtTime(0.01, start + 0.14);
+
+          osc.connect(gain);
+          gain.connect(this.masterGain);
+          osc.start(start);
+          osc.stop(start + 0.15);
+        }
+      }
+
+      bell() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1046.5, now);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.45);
+      }
+
+      paper() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = this.sharedNoiseBuffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1200, now);
+        filter.Q.value = 1.2;
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+        noise.start(now, Math.random() * 1.5, 0.14);
+      }
+
+    }
+
+    const audio = new RetroAudio();
+
+    /* ==========================================================================
+       2. KARAKTER VE KİMLİK ÇİZİM MOTORU (HTML5 CANVAS)
+       ========================================================================== */
+    const SKIN_COLORS = ['#ffdbac', '#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#fce1ce'];
+    const HAIR_COLORS = ['#1a1110', '#3d2314', '#703e19', '#d49b43', '#8b1e1e', '#2980b9'];
+    const CLOTH_COLORS = ['#2c3e50', '#8e44ad', '#27ae60', '#d35400', '#c0392b', '#16a085', '#34495e'];
+
+    const VALID_FACULTIES = [
+      'Hukuk Fakültesi',
+      'İktisat Fakültesi',
+      'Siyasal Bilgiler Fakültesi',
+      'İletişim Fakültesi',
+      'Edebiyat Fakültesi',
+      'Fen Fakültesi',
+      'Eczacılık Fakültesi',
+      'Su Bilimleri Fakültesi'
+    ];
+
+    const INVALID_FACULTIES = [
+      'Cerrahpaşa Tıp Fakültesi (İÜC)',
+      'Mühendislik Fakültesi (İÜC - Avcılar)',
+      'Orman Fakültesi (İÜC - Bahçeköy)',
+      'Veteriner Fakültesi (İÜC - Avcılar)',
+      'Büyücülük ve Simya Fakültesi',
+      'ODTÜ Bilgisayar Mühendisliği',
+      'Boğaziçi Uluslararası İlişkiler',
+      'Korsanlık ve Yağmacılık Bilimi'
+    ];
+
+    const FEMALE_NAMES = [
+      'Elif', 'Zeynep', 'Ceren', 'İrem', 'Merve', 'Buse', 'Sena', 'Damla',
+      'Dilara', 'Selin', 'Melis', 'Ece', 'Gizem', 'Derya', 'Nazlı', 'Yasemin'
+    ];
+
+    const MALE_NAMES = [
+      'Can', 'Ahmet', 'Alper', 'Onur', 'Furkan', 'Burak', 'Eren', 'Emre',
+      'Kerem', 'Mert', 'Yusuf', 'Kaan', 'Tolga', 'Bora', 'Oğuz', 'Gökhan'
+    ];
+
+    const FEMALE_HAIR_STYLES = ['long', 'ponytail', 'bun', 'bangs', 'bob', 'curly'];
+    const MALE_HAIR_STYLES = ['short', 'curly', 'bald', 'beanie'];
+
+    const LAST_NAMES = [
+      'Yılmaz', 'Kaya', 'Demir', 'Çelik', 'Şahin', 'Yıldız', 'Öztürk', 'Aydın',
+      'Özdemir', 'Arslan', 'Doğan', 'Kılıç', 'Aslan', 'Çetin', 'Kara', 'Koç',
+      'Kurt', 'Özkan', 'Şimşek', 'Polat', 'Korkmaz', 'Erdoğan', 'Yavuz'
+    ];
+
+    /* ==========================================================================
+       NÖTR & DOĞAL ÖĞRENCİ DİYALOG HAVUZU (HİÇBİR İPUCU / SPOILER İÇERMEZ)
+       ========================================================================== */
+    const NEUTRAL_STUDENT_DIALOGS = [
+      "Kolay gelsin abi, vizeler başladı çok yoğunuz.",
+      "Kütüphanede arkadaşım yer tuttu, ona yetişmem lazım.",
+      "Günaydın, bugün hava çok soğuk ya turnikeler de buz gibi.",
+      "Hocam ders amfide miydi blokta mı unuttum, geç kaldım zaten.",
+      "Merhaba, yemekhane sırası uzamadan gireyim bari.",
+      "Kartım çantanın dibinde kalmış, anca buldum kusura bakma.",
+      "Bugün kampüste çorba dağıtımı varmış, yetişebilir miyim acaba?",
+      "Kolay gelsin, ders 10'da başlıyor yetişir miyim?",
+      "İyi nöbetler abi, fotokopicide sıra vardı geciktim biraz.",
+      "Arkadaşlarla bahçede buluşacaktık, geç kaldım.",
+      "Merhaba abi, bu sene dersler çok ağırlaştı gerçekten.",
+      "İyi çalışmalar memur bey, hava da amma rüzgarlı bugün.",
+      "Buyrun kimliğim, kolay gelsin iyi nöbetler.",
+      "Sabah kahvesi içmeden derse giremiyorum ya...",
+      "Hocam Çorlulu Ali Paşa'da çay içtik geciktik biraz.",
+      "Bugün kulüp toplantımız var bahçede, ona gidiyorum.",
+      "Sınav kağıdımı hocanın odasına bırakmam lazım acilen.",
+      "Günaydın memur bey, bugün kampüs baya kalabalık görünüyor.",
+      "Kartlık cebimde sıkışmış, anca çıkarabildim kusura bakmayın.",
+      "İyi günler abi, merkez kütüphanede prizli masa bulurum inşallah.",
+      "Ders başlamadan önce kantinden bir su alıp çıkayım bari.",
+      "Merhaba, sunum dosyamı bastırdım hocaya götürüyorum.",
+      "Kolay gelsin, nöbetiniz sakin geçsin memur bey.",
+      "Bugün amfide seminer varmış, dinleyici olarak geldim.",
+      "Metrodan indim koşa koşa geldim, nefes nefese kaldım valla.",
+      "İyi çalışmalar abi, bugün hava çok güzel ders çalışasım hiç yok.",
+      "Kitaplarımı dolapta unutmuşum, onları almaya geldim.",
+      "Merhaba memur bey, turnike yine tek seferde okumadı kartı.",
+      "Ders programı bu dönem çok çakıştı, bir amfiden diğerine koşuyoruz.",
+      "Kolay gelsin abi, arkadaş grubu içeride bekliyor beni.",
+      "Bugün vize sonuçları açıklanacakmış, içim içimi yiyor valla.",
+      "İyi günler memur bey, ödev teslimi için son 15 dakika kaldı!",
+      "Sabah sabah tramvay tıklım tıklımdı, zor attım kendimi kapıya.",
+      "Yemekhanede bugün ne var acaba, biliyor musunuz abi?",
+      "Buyrun kartım memur bey, hayırlı mesailer dilerim.",
+      "Marmara Kıraathanesi'nde sabahladık, ders kafamı yaktı valla."
+    ];
+
+    /* ==========================================================================
+       KARAR SONRASI ÖĞRENCİ TEPKİ REPLİKLERİ (KABUL / RET TEPKİLERİ)
+       ========================================================================== */
+    const APPROVAL_REACTIONS = [
+      "Sağ olun hocam, iyi nöbetler!",
+      "Çok teşekkürler abi, vizeye yetişiyorum!",
+      "Eyvallah memur bey, kolay gelsin!",
+      "Harikasınız abi, amfiye uçuyorum!",
+      "Teşekkür ederim, iyi çalışmalar!",
+      "Hayırlı mesailer abi, sağ olasın!",
+      "Son anda yetiştik valla, çok teşekkürler!",
+      "İyi nöbetler dilerim memur bey!",
+      "Sağ olun, kütüphanede yer kapabilirim artık!",
+      "Teşekkürler hocam, kolaylıklar dilerim!",
+      "Adamsın abi, ders başlamak üzereydi!",
+      "Görüşmek üzere memur bey, iyi günler!"
+    ];
+
+    const REJECTION_REACTIONS = [
+      "Aşk olsun abi ya, vizeye giremeyeceğim...",
+      "Hocam gerçekten öğrenciyim ama ya!",
+      "Geri dönüyorum o zaman, off...",
+      "İdare edemez miydiniz memur bey?",
+      "İtiraz edeceğim ama buna!",
+      "Gitti koca dönem ya, inanamıyorum...",
+      "Peki öyle olsun abi, iyi günler...",
+      "Avcılar'dan gelmiştim boşuna mıydı yani?",
+      "Öğrenci işlerine gideyim bari...",
+      "Sisteminiz çok katıymış valla!",
+      "Neyse... Başka kapıdan denerim.",
+      "Haksızlık bu ya, gerçekten İÜ öğrencisiyim!"
+    ];
+
+    function drawAvatarPaths(ctx, traits, w, h, isVesikalik = false) {
+      ctx.clearRect(0, 0, w, h);
+
+      if (isVesikalik) {
+        ctx.fillStyle = '#b0c4de';
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      const cx = w / 2;
+      const cy = h * 0.48;
+      const scale = isVesikalik ? 0.72 : 1.0;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(scale, scale);
+
+      // GÖVDE
+      ctx.fillStyle = traits.clothColor;
+      ctx.beginPath();
+      ctx.ellipse(0, 95, 80, 55, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Yaka
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(-20, 60);
+      ctx.lineTo(0, 80);
+      ctx.lineTo(20, 60);
+      ctx.closePath();
+      ctx.fill();
+
+      // Boyun
+      ctx.fillStyle = traits.skinColor;
+      ctx.fillRect(-18, 38, 36, 30);
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.fillRect(-18, 38, 36, 12);
+
+      // Yüz
+      ctx.fillStyle = traits.skinColor;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 48, 56, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Kulaklar
+      ctx.fillStyle = traits.skinColor;
+      ctx.beginPath();
+      ctx.ellipse(-48, 2, 9, 14, 0, 0, Math.PI * 2);
+      ctx.ellipse(48, 2, 9, 14, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Gözler
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(-18, -4, 9, 6, 0, 0, Math.PI * 2);
+      ctx.ellipse(18, -4, 9, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#222';
+      ctx.beginPath();
+      ctx.arc(-18, -4, 4, 0, Math.PI * 2);
+      ctx.arc(18, -4, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(-19, -5, 1.5, 0, Math.PI * 2);
+      ctx.arc(17, -5, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Kadın karakterlerde kirpik
+      if (traits.gender === 'female') {
+        ctx.strokeStyle = '#111';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-27, -7); ctx.lineTo(-31, -11);
+        ctx.moveTo(-23, -9); ctx.lineTo(-25, -14);
+        ctx.moveTo(27, -7); ctx.lineTo(31, -11);
+        ctx.moveTo(23, -9); ctx.lineTo(25, -14);
+        ctx.stroke();
+      }
+
+      // Kaşlar
+      ctx.strokeStyle = traits.hairColor;
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(-28, -16);
+      ctx.lineTo(-9, -14);
+      ctx.moveTo(9, -14);
+      ctx.lineTo(28, -16);
+      ctx.stroke();
+
+      // Burun
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(0, -6);
+      ctx.lineTo(3, 12);
+      ctx.lineTo(-4, 15);
+      ctx.stroke();
+
+      // Ağız
+      ctx.strokeStyle = '#8b4513';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      if (traits.mood === 'smile') {
+        ctx.arc(0, 26, 12, 0.2, Math.PI - 0.2, false);
+      } else {
+        ctx.moveTo(-10, 28);
+        ctx.lineTo(10, 28);
+      }
+      ctx.stroke();
+
+      // Sakal
+      if (traits.hasBeard) {
+        ctx.fillStyle = traits.hairColor;
+        ctx.beginPath();
+        ctx.ellipse(0, 22, 16, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, 36, 18, 0.1, Math.PI - 0.1, false);
+        ctx.lineTo(0, 52);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Saç
+      ctx.fillStyle = traits.hairColor;
+      ctx.beginPath();
+      if (traits.hairStyle === 'short') {
+        ctx.ellipse(0, -32, 50, 34, 0, Math.PI, Math.PI * 2);
+        ctx.rect(-50, -32, 100, 16);
+        ctx.fill();
+      } else if (traits.hairStyle === 'curly') {
+        for (let a = 0; a < Math.PI * 2; a += 0.5) {
+          const hx = Math.cos(a) * 44;
+          const hy = -28 + Math.sin(a) * 26;
+          ctx.arc(hx, hy, 16, 0, Math.PI * 2);
+        }
+        ctx.fill();
+      } else if (traits.hairStyle === 'long') {
+        ctx.ellipse(0, -32, 52, 36, 0, Math.PI, Math.PI * 2);
+        ctx.rect(-52, -32, 104, 20);
+        ctx.rect(-52, -12, 22, 85);
+        ctx.rect(30, -12, 22, 85);
+        ctx.fill();
+      } else if (traits.hairStyle === 'ponytail') {
+        ctx.ellipse(0, -32, 51, 35, 0, Math.PI, Math.PI * 2);
+        ctx.rect(-51, -32, 102, 18);
+        ctx.fill();
+        // At kuyruğu (yan tarafta sarkan)
+        ctx.beginPath();
+        ctx.ellipse(56, 10, 13, 42, -0.15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#e74c3c';
+        ctx.fillRect(44, -30, 14, 7);
+      } else if (traits.hairStyle === 'bun') {
+        ctx.ellipse(0, -32, 51, 35, 0, Math.PI, Math.PI * 2);
+        ctx.rect(-51, -32, 102, 16);
+        ctx.fill();
+        // Topuz
+        ctx.beginPath();
+        ctx.arc(0, -76, 20, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (traits.hairStyle === 'bangs') {
+        ctx.ellipse(0, -32, 52, 36, 0, Math.PI, Math.PI * 2);
+        ctx.rect(-52, -32, 104, 13);
+        ctx.rect(-52, -2, 16, 70);
+        ctx.rect(36, -2, 16, 70);
+        ctx.fill();
+        // Kakül çizgisi
+        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-14, -34);
+        ctx.lineTo(-8, -16);
+        ctx.moveTo(10, -34);
+        ctx.lineTo(16, -18);
+        ctx.stroke();
+      } else if (traits.hairStyle === 'bob') {
+        ctx.ellipse(0, -32, 53, 37, 0, Math.PI, Math.PI * 2);
+        ctx.rect(-53, -32, 106, 20);
+        ctx.rect(-53, -12, 20, 56);
+        ctx.rect(33, -12, 20, 56);
+        ctx.fill();
+      } else if (traits.hairStyle === 'bald') {
+        ctx.ellipse(-44, -10, 6, 20, 0, 0, Math.PI * 2);
+        ctx.ellipse(44, -10, 6, 20, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = '#34495e';
+        ctx.ellipse(0, -32, 52, 38, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#2c3e50';
+        ctx.fillRect(-52, -26, 104, 12);
+      }
+
+      // Gözlük
+      if (traits.hasGlasses) {
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 3.5;
+        ctx.strokeRect(-32, -14, 24, 18);
+        ctx.strokeRect(8, -14, 24, 18);
+        ctx.beginPath();
+        ctx.moveTo(-8, -5);
+        ctx.lineTo(8, -5);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.fillRect(-30, -12, 20, 14);
+        ctx.fillRect(10, -12, 20, 14);
+      }
+
+      ctx.restore();
+    }
+
+    // 60FPS SPRITE CACHING: Karakter çizimini tek seferliğine tam çözünürlükte önbelleğe alıp saklar (Sıfır Yeniden Çizim)
+    function createAvatarSprite(traits, isVesikalik = false) {
+      const w = isVesikalik ? 140 : 240;
+      const h = isVesikalik ? 170 : 280;
+      const spriteCanvas = document.createElement('canvas');
+      spriteCanvas.width = w;
+      spriteCanvas.height = h;
+      const ctx = spriteCanvas.getContext('2d', { alpha: true });
+      drawAvatarPaths(ctx, traits, w, h, isVesikalik);
+      return spriteCanvas;
+    }
+
+    function renderAvatar(canvas, traits, isVesikalik = false) {
+      const sprite = createAvatarSprite(traits, isVesikalik);
+      const targetCtx = canvas.getContext('2d');
+      targetCtx.clearRect(0, 0, canvas.width, canvas.height);
+      targetCtx.drawImage(sprite, 0, 0);
+      return sprite;
+    }
+
+    /* ==========================================================================
+       3. ÖĞRENCİ VE BELGE ÜRETİM MANTIĞI & DİYALOG SEÇİM ALGORİTMASI
+       ========================================================================== */
+    function getRandomItem(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    // Fisher-Yates Shuffle
+    function shuffleArray(array) {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function generateStudent(usedDialogsSet) {
+      const isFemale = Math.random() < 0.5;
+      const studentTraits = {
+        gender: isFemale ? 'female' : 'male',
+        skinColor: getRandomItem(SKIN_COLORS),
+        hairColor: getRandomItem(HAIR_COLORS),
+        hairStyle: getRandomItem(isFemale ? FEMALE_HAIR_STYLES : MALE_HAIR_STYLES),
+        clothColor: getRandomItem(CLOTH_COLORS),
+        hasGlasses: Math.random() < 0.4,
+        hasBeard: isFemale ? false : Math.random() < 0.35,
+        mood: Math.random() < 0.5 ? 'smile' : 'normal'
+      };
+
+      const cardTraits = { ...studentTraits };
+
+      const firstName = getRandomItem(isFemale ? FEMALE_NAMES : MALE_NAMES);
+      const lastName = getRandomItem(LAST_NAMES);
+      const fullName = `${firstName} ${lastName}`;
+
+      const validStudentNumber = `1001${Math.floor(20 + Math.random() * 6)}${String(Math.floor(1000 + Math.random() * 9000))}`;
+      const validFaculty = getRandomItem(VALID_FACULTIES);
+      const validExpiryYears = ['30.09.2026', '31.12.2026', '30.06.2027', '30.06.2028'];
+      const validExpiry = getRandomItem(validExpiryYears);
+
+      let sealState = 'valid';
+      const isSuspicious = Math.random() < 0.55;
+      const defectTypes = [];
+
+      let studentNo = validStudentNumber;
+      let faculty = validFaculty;
+      let expiry = validExpiry;
+
+      if (isSuspicious) {
+        const defectChoices = [
+          'EXPIRED_DATE',
+          'INVALID_FACULTY',
+          'BAD_STUDENT_NO',
+          'BAD_SEAL',
+          'PHOTO_MISMATCH'
+        ];
+
+        const primaryDefect = getRandomItem(defectChoices);
+        defectTypes.push(primaryDefect);
+
+        if (Math.random() < 0.25) {
+          const secondary = getRandomItem(defectChoices.filter(d => d !== primaryDefect));
+          defectTypes.push(secondary);
+        }
+
+        defectTypes.forEach(defect => {
+          if (defect === 'EXPIRED_DATE') {
+            const pastYears = ['15.06.2023', '30.09.2024', '15.02.2025', '10.01.2026'];
+            expiry = getRandomItem(pastYears);
+          } else if (defect === 'INVALID_FACULTY') {
+            faculty = getRandomItem(INVALID_FACULTIES);
+          } else if (defect === 'BAD_STUDENT_NO') {
+            const badFormats = [
+              `1001TR${Math.floor(1000 + Math.random() * 9000)}`,
+              `100X${Math.floor(10000 + Math.random() * 90000)}`,
+              `99821`,
+              `10012204529988`
+            ];
+            studentNo = getRandomItem(badFormats);
+          } else if (defect === 'BAD_SEAL') {
+            sealState = Math.random() < 0.5 ? 'missing' : 'fake';
+          } else if (defect === 'PHOTO_MISMATCH') {
+            const mismatchOptions = isFemale
+              ? ['hair_color', 'glasses', 'hair_style']
+              : ['hair_color', 'glasses', 'beard', 'hair_style'];
+            const mismatchType = getRandomItem(mismatchOptions);
+            if (mismatchType === 'hair_color') {
+              cardTraits.hairColor = cardTraits.hairColor === '#1a1110' ? '#d49b43' : '#1a1110';
+            } else if (mismatchType === 'glasses') {
+              cardTraits.hasGlasses = !studentTraits.hasGlasses;
+            } else if (mismatchType === 'beard') {
+              cardTraits.hasBeard = !studentTraits.hasBeard;
+            } else {
+              const styles = isFemale ? FEMALE_HAIR_STYLES : MALE_HAIR_STYLES;
+              cardTraits.hairStyle = getRandomItem(styles.filter(s => s !== studentTraits.hairStyle));
+            }
+          }
+        });
+      }
+
+      // ========================================================================
+      // NÖTR DİYALOG SEÇİMİ: HİÇBİR İPUCU VERMEZ (GEÇERLİ VE SAHTE AYNI HAVUZU KULLANIR)
+      // DİYALOG TEKRARI VARDİYA BOYUNCA KESİNLİKLE ENGELLENİR
+      // ========================================================================
+      let availableDialogs = NEUTRAL_STUDENT_DIALOGS.filter(d => !usedDialogsSet.has(d));
+
+      // Eğer havuz biterse sıfırlayarak devam et
+      if (availableDialogs.length === 0) {
+        availableDialogs = [...NEUTRAL_STUDENT_DIALOGS];
+      }
+
+      // Karıştır ve ilkini seç
+      const shuffled = shuffleArray(availableDialogs);
+      const chosenDialog = shuffled[0];
+
+      // Kullanılan repliği kaydet (aynı vardiyada ASLA tekrar etmez)
+      usedDialogsSet.add(chosenDialog);
+
+      // Karakter ses tonu (voice pitch):
+      let voicePitch;
+      if (isFemale) {
+        voicePitch = Math.floor(260 + Math.random() * 70); // Tiz / ince ses
+      } else if (studentTraits.hasBeard) {
+        voicePitch = Math.floor(125 + Math.random() * 45); // Kalın / pes ses
+      } else {
+        voicePitch = Math.floor(150 + Math.random() * 50); // Orta ton
+      }
+
+      // Karakter ve vesikalık çizimlerini tek seferlik tam çözünürlükte önbelleğe al (Sprite Caching)
+      const characterSprite = createAvatarSprite(studentTraits, false);
+      const photoSprite = createAvatarSprite(cardTraits, true);
+
+      return {
+        traits: studentTraits,
+        cardTraits: cardTraits,
+        fullName: fullName,
+        studentNo: studentNo,
+        faculty: faculty,
+        expiry: expiry,
+        sealState: sealState,
+        isSuspicious: isSuspicious,
+        defectTypes: defectTypes,
+        dialog: chosenDialog,
+        voicePitch: voicePitch,
+        characterSprite: characterSprite,
+        photoSprite: photoSprite
+      };
+    }
+
+    /* ==========================================================================
+       4. OYUN YÖNETİCİSİ VE AKIŞ MANTIĞI (GAME CONTROLLER)
+       ========================================================================== */
+    class GameController {
+      constructor() {
+        this.shift = 1;
+        this.studentIndex = 0;
+        this.maxStudents = 10;
+        this.score = 0;
+        this.strikes = 0;
+        this.correctCount = 0;
+        this.currentStudent = null;
+        this.isProcessing = false;
+        this.gameStarted = false;
+
+        // VARDİYA BOYUNCA DİYALOG TEKRARINI ENGELLEYEN SET
+        this.usedDialogs = new Set();
+
+        this.hour = 8;
+        this.minute = 30;
+
+        this.dom = {
+          shift: document.getElementById('val-shift'),
+          studentCount: document.getElementById('val-student-count'),
+          time: document.getElementById('val-time'),
+          score: document.getElementById('val-score'),
+          strike1: document.getElementById('strike-1'),
+          strike2: document.getElementById('strike-2'),
+          strike3: document.getElementById('strike-3'),
+          studentContainer: document.getElementById('student-container'),
+          studentCanvas: document.getElementById('student-canvas'),
+          cardPhotoCanvas: document.getElementById('card-photo-canvas'),
+          speechBubble: document.getElementById('speech-bubble'),
+          gateFlash: document.getElementById('gate-flash'),
+          feedbackBanner: document.getElementById('feedback-banner'),
+          // Masadaki Kart
+          idCard: document.getElementById('id-card'),
+          cardName: document.getElementById('card-name'),
+          cardNo: document.getElementById('card-no'),
+          cardFaculty: document.getElementById('card-faculty'),
+          cardExpiry: document.getElementById('card-expiry'),
+          cardSeal: document.getElementById('card-seal'),
+          cardStamp: document.getElementById('card-stamp'),
+          // İnceleme Modu
+          inspectModal: document.getElementById('inspect-modal'),
+          inspectPhotoCanvas: document.getElementById('inspect-photo-canvas'),
+          inspectName: document.getElementById('inspect-name'),
+          inspectNo: document.getElementById('inspect-no'),
+          inspectFaculty: document.getElementById('inspect-faculty'),
+          inspectExpiry: document.getElementById('inspect-expiry'),
+          inspectSeal: document.getElementById('inspect-seal'),
+          btnCloseInspectIcon: document.getElementById('btn-close-inspect-icon'),
+          btnInspectClose: document.getElementById('btn-inspect-close'),
+          btnInspectApprove: document.getElementById('btn-inspect-approve'),
+          btnInspectReject: document.getElementById('btn-inspect-reject'),
+          // Masadaki Not Kağıdı
+          deskMemoCard: document.getElementById('desk-memo-card'),
+          // Butonlar
+          btnApprove: document.getElementById('btn-approve'),
+          btnReject: document.getElementById('btn-reject'),
+          btnRules: document.getElementById('btn-open-rules'),
+          btnCloseRules: document.getElementById('btn-close-rules'),
+          btnCloseRulesIcon: document.getElementById('btn-close-rules-icon'),
+          btnSound: document.getElementById('btn-sound-toggle'),
+          // Modallar
+          tutorialModal: document.getElementById('tutorial-modal'),
+          btnStartDuty: document.getElementById('btn-start-duty'),
+          rulesModal: document.getElementById('rules-modal'),
+          reportModal: document.getElementById('report-modal'),
+          reportTitle: document.getElementById('report-title'),
+          reportSubtitle: document.getElementById('report-subtitle'),
+          reportTotal: document.getElementById('rep-total'),
+          reportCorrect: document.getElementById('rep-correct'),
+          reportStrikes: document.getElementById('rep-strikes'),
+          reportSalary: document.getElementById('rep-salary'),
+          reportMessage: document.getElementById('report-message'),
+          btnReportAction: document.getElementById('btn-report-action'),
+          // Masa ve Güvenlik Kolları
+          deskStage: document.getElementById('desk-stage'),
+          guardArmRight: document.getElementById('guard-arm-right'),
+          heldStampBase: document.getElementById('held-stamp-base')
+        };
+
+        this.initEvents();
+      }
+
+      initEvents() {
+        // EĞİTİM BAŞLA BUTONU
+        this.dom.btnStartDuty.addEventListener('click', () => {
+          this.dom.tutorialModal.style.display = 'none';
+          this.gameStarted = true;
+          audio.unlock();
+          audio.click();
+          this.startShift();
+        });
+
+        // MASADAKİ KARTA TIKLANDIĞINDA İNCELEME MODU AÇILIR
+        this.dom.idCard.addEventListener('click', () => {
+          if (!this.currentStudent) return;
+          this.openInspectModal();
+        });
+
+        // İNCELEME MODU KAPATMA
+        this.dom.btnInspectClose.addEventListener('click', () => this.closeInspectModal());
+        this.dom.btnCloseInspectIcon.addEventListener('click', () => this.closeInspectModal());
+        this.dom.inspectModal.addEventListener('click', (e) => {
+          if (e.target === this.dom.inspectModal) this.closeInspectModal();
+        });
+
+        // İNCELEME EKRANINDAN DOĞRUDAN ONAYLA / REDDET
+        this.dom.btnInspectApprove.addEventListener('click', () => {
+          this.closeInspectModal();
+          this.handleDecision(true);
+        });
+        this.dom.btnInspectReject.addEventListener('click', () => {
+          this.closeInspectModal();
+          this.handleDecision(false);
+        });
+
+        // MASADAKİ TALİMAT NOT KAĞIDINA TIKLANINCA TALİMATNAME AÇILIR
+        this.dom.deskMemoCard.addEventListener('click', () => {
+          this.toggleRulesModal(true);
+        });
+
+        // ONAYLA / REDDET BUTONLARI (MASA)
+        this.dom.btnApprove.addEventListener('click', () => this.handleDecision(true));
+        this.dom.btnReject.addEventListener('click', () => this.handleDecision(false));
+
+        // KLAVYE KISAYOLLARI
+        window.addEventListener('keydown', (e) => {
+          if (!this.gameStarted && this.dom.tutorialModal.style.display !== 'none') {
+            if (e.key === 'Enter' || e.key === ' ') {
+              this.dom.btnStartDuty.click();
+            }
+            return;
+          }
+
+          // İnceleme Modu Açıksa
+          if (this.dom.inspectModal.classList.contains('active')) {
+            if (e.key === 'Escape') {
+              this.closeInspectModal();
+              return;
+            }
+            const k = e.key.toLowerCase();
+            if (k === 'd' || k === 'arrowright') {
+              this.closeInspectModal();
+              this.handleDecision(true);
+              return;
+            } else if (k === 'a' || k === 'arrowleft') {
+              this.closeInspectModal();
+              this.handleDecision(false);
+              return;
+            }
+          }
+
+          // Görev Talimatı Modalı Açıksa
+          if (this.dom.rulesModal.classList.contains('active')) {
+            if (e.key === 'Escape' || e.key === 'b' || e.key === 'B') {
+              this.toggleRulesModal(false);
+            }
+            return;
+          }
+
+          if (this.dom.reportModal.classList.contains('active')) {
+            if (e.key === 'Enter' || e.key === ' ') {
+              this.dom.btnReportAction.click();
+            }
+            return;
+          }
+
+          if (this.isProcessing) return;
+
+          const key = e.key.toLowerCase();
+          if (key === 'd' || key === 'arrowright' || key === 'enter') {
+            this.handleDecision(true);
+          } else if (key === 'a' || key === 'arrowleft' || key === 'backspace') {
+            this.handleDecision(false);
+          } else if (key === 'b') {
+            this.toggleRulesModal(true);
+          }
+        });
+
+        // TALİMAT MODALI BUTONLARI
+        this.dom.btnRules.addEventListener('click', () => this.toggleRulesModal(true));
+        this.dom.btnCloseRules.addEventListener('click', () => this.toggleRulesModal(false));
+        this.dom.btnCloseRulesIcon.addEventListener('click', () => this.toggleRulesModal(false));
+        this.dom.rulesModal.addEventListener('click', (e) => {
+          if (e.target === this.dom.rulesModal) this.toggleRulesModal(false);
+        });
+
+        // SES TOGGLE
+        this.dom.btnSound.addEventListener('click', () => {
+          const state = audio.toggle();
+          if (state) audio.click();
+          this.dom.btnSound.textContent = state ? '🔊 SES: AÇIK' : '🔈 SES: KAPALI';
+        });
+
+        // VARDİYA RAPORU AKSİYONU
+        this.dom.btnReportAction.addEventListener('click', () => {
+          this.dom.reportModal.classList.remove('active');
+          if (this.strikes >= 3) {
+            this.shift = 1;
+            this.score = 0;
+            this.startShift();
+          } else {
+            this.shift++;
+            this.startShift();
+          }
+        });
+      }
+
+      openInspectModal() {
+        if (!this.currentStudent) return;
+        audio.paper();
+
+        // İnceleme modalındaki kart verilerini güncelle (önbellekteki fotoğraftan sıfır maliyetli çizim)
+        const iCtx = this.dom.inspectPhotoCanvas.getContext('2d');
+        iCtx.clearRect(0, 0, 140, 170);
+        iCtx.drawImage(this.currentStudent.photoSprite, 0, 0);
+
+        this.dom.inspectName.textContent = this.currentStudent.fullName;
+        this.dom.inspectNo.textContent = this.currentStudent.studentNo;
+        this.dom.inspectFaculty.textContent = this.currentStudent.faculty;
+        this.dom.inspectExpiry.textContent = this.currentStudent.expiry;
+
+        const seal = this.dom.inspectSeal;
+        seal.className = 'card-seal';
+        if (this.currentStudent.sealState === 'missing') {
+          seal.classList.add('missing');
+        } else if (this.currentStudent.sealState === 'fake') {
+          seal.classList.add('fake-seal');
+          seal.innerHTML = '<span>GEÇERSİZ</span><span style="font-size:8px;">ONAYSIZ</span><span>MÜHÜR</span>';
+        } else {
+          seal.innerHTML = '<span>T.C. İSTANBUL ÜNİV.</span><span style="font-size:9px;">★ REKTÖRLÜK ★</span><span>MÜHRÜ</span>';
+        }
+
+        this.dom.inspectModal.classList.add('active');
+      }
+
+      closeInspectModal() {
+        audio.paper();
+        this.dom.inspectModal.classList.remove('active');
+      }
+
+      toggleRulesModal(show) {
+        if (show) {
+          audio.paper();
+          this.dom.rulesModal.classList.add('active');
+        } else {
+          audio.paper();
+          this.dom.rulesModal.classList.remove('active');
+        }
+      }
+
+      startShift() {
+        this.studentIndex = 0;
+        this.strikes = 0;
+        this.correctCount = 0;
+        this.usedDialogs.clear(); // Her yeni vardiyada diyalog havuzu sıfırlanır
+        this.hour = 8 + (this.shift - 1) * 3;
+        this.minute = 30;
+        this.updateHeader();
+        this.loadNextStudent();
+      }
+
+      updateHeader() {
+        this.dom.shift.textContent = this.shift;
+        this.dom.studentCount.textContent = `${this.studentIndex + 1} / ${this.maxStudents}`;
+        const fHour = String(this.hour).padStart(2, '0');
+        const fMin = String(this.minute).padStart(2, '0');
+        this.dom.time.textContent = `${fHour}:${fMin}`;
+        this.dom.score.textContent = `${this.score} ₺`;
+
+        this.dom.strike1.className = `strike-lamp ${this.strikes >= 1 ? 'active' : ''}`;
+        this.dom.strike2.className = `strike-lamp ${this.strikes >= 2 ? 'active' : ''}`;
+        this.dom.strike3.className = `strike-lamp ${this.strikes >= 3 ? 'active' : ''}`;
+      }
+
+      loadNextStudent() {
+        if (this.studentIndex >= this.maxStudents) {
+          this.finishShift();
+          return;
+        }
+
+        this.isProcessing = true;
+        // Benzersiz diyalog garantisiyle yeni öğrenci üret
+        this.currentStudent = generateStudent(this.usedDialogs);
+
+        this.minute += Math.floor(15 + Math.random() * 20);
+        if (this.minute >= 60) {
+          this.hour += Math.floor(this.minute / 60);
+          this.minute %= 60;
+        }
+        this.updateHeader();
+
+        this.dom.cardStamp.className = 'card-decision-stamp';
+        this.dom.speechBubble.classList.remove('visible');
+
+        // Önbelleğe alınmış hazır sprite'ları tek hamlede GPU dostu aktar (Sıfır Yeniden Çizim & 60FPS)
+        const sCtx = this.dom.studentCanvas.getContext('2d');
+        sCtx.clearRect(0, 0, 240, 280);
+        sCtx.drawImage(this.currentStudent.characterSprite, 0, 0);
+
+        const cCtx = this.dom.cardPhotoCanvas.getContext('2d');
+        cCtx.clearRect(0, 0, 140, 170);
+        cCtx.drawImage(this.currentStudent.photoSprite, 0, 0);
+
+        // Masadaki kimlik verilerini güncelle
+        this.dom.cardName.textContent = this.currentStudent.fullName;
+        this.dom.cardNo.textContent = this.currentStudent.studentNo;
+        this.dom.cardFaculty.textContent = this.currentStudent.faculty;
+        this.dom.cardExpiry.textContent = this.currentStudent.expiry;
+
+        const seal = this.dom.cardSeal;
+        seal.className = 'card-seal';
+        if (this.currentStudent.sealState === 'missing') {
+          seal.classList.add('missing');
+        } else if (this.currentStudent.sealState === 'fake') {
+          seal.classList.add('fake-seal');
+          seal.innerHTML = '<span>GEÇERSİZ</span><span style="font-size:8px;">ONAYSIZ</span><span>MÜHÜR</span>';
+        } else {
+          seal.innerHTML = '<span>T.C. İSTANBUL ÜNİV.</span><span style="font-size:9px;">★ REKTÖRLÜK ★</span><span>MÜHRÜ</span>';
+        }
+
+        // GEÇİŞ MİMARİSİ: JS zamanlayıcı/rAF döngüsü YOK. Sadece sınıf değişir, hareketi CSS transition (GPU) yapar.
+        // 1) Önceki çıkıştan kalan durumu geçişsiz (anında) kapı konumuna sıfırla
+        const sc = this.dom.studentContainer;
+        sc.className = '';
+
+        // 2) Bir sonraki boyama sonrası 'arrived' sınıfı: kapıdan masaya translate3d + scale3d ile süzülür (0.6s)
+        setTimeout(() => { sc.className = 'arrived'; }, 50);
+
+        // 3) Varışta evrak sesi, hemen ardından konuşma balonu
+        setTimeout(() => {
+          audio.paper();
+          setTimeout(() => {
+            this.dom.speechBubble.textContent = this.currentStudent.dialog;
+            this.dom.speechBubble.classList.add('visible');
+            this.isProcessing = false;
+          }, 120);
+        }, 680);
+      }
+
+      handleDecision(approved) {
+        if (this.isProcessing || !this.currentStudent) return;
+        this.isProcessing = true;
+
+        // 1. Damganın rengini ayarla ve sağ kol damgalama animasyonunu başlat (Layout Thrashing engellendi)
+        if (this.dom.heldStampBase) {
+          this.dom.heldStampBase.className = `held-stamp-base ${approved ? 'approved-glow' : 'rejected-glow'}`;
+        }
+        if (this.dom.guardArmRight) {
+          // Sınıf her kararda 550ms sonra kaldırıldığı için yeniden başlatma hilesine (reflow/rAF) gerek yok
+          this.dom.guardArmRight.classList.add('stamping-active');
+        }
+
+        // 2. Damganın tam karta çarptığı an (performStampHit tepe noktası: ~260ms)
+        setTimeout(() => {
+          // Tok damga sesi + masanın sarsılması
+          audio.stamp(approved);
+          if (this.dom.deskStage) {
+            this.dom.deskStage.classList.add('desk-shaking');
+            setTimeout(() => {
+              if (this.dom.deskStage) this.dom.deskStage.classList.remove('desk-shaking');
+            }, 230);
+          }
+
+          // Karta basılan mühür damgası
+          const stamp = this.dom.cardStamp;
+          stamp.textContent = approved ? 'GİRİŞ ONAYLANDI' : 'GİRİŞ REDDEDİLDİ';
+          stamp.className = `card-decision-stamp ${approved ? 'approved' : 'rejected'}`;
+
+          // Kapı ışık parlaması
+          const flash = this.dom.gateFlash;
+          flash.className = `gate-flash ${approved ? 'approved' : 'rejected'}`;
+          setTimeout(() => { flash.className = 'gate-flash'; }, 400);
+
+          // Karara öğrencinin vereceği tepki repliği (sessiz)
+          const reactionText = getRandomItem(approved ? APPROVAL_REACTIONS : REJECTION_REACTIONS);
+          this.dom.speechBubble.textContent = reactionText;
+          this.dom.speechBubble.classList.add('visible');
+
+          // Skor & kural kontrolü
+          const isLegit = !this.currentStudent.isSuspicious;
+          let isCorrect = false;
+          let feedbackText = '';
+
+          if (approved && isLegit) {
+            isCorrect = true;
+            feedbackText = '✔ DOĞRU KARAR: Öğrenci kurallara uygun şekilde içeri alındı. (+100 ₺)';
+          } else if (!approved && !isLegit) {
+            isCorrect = true;
+            const reasons = this.getDefectReasons(this.currentStudent.defectTypes);
+            feedbackText = `✔ TEBRİKLER! Sahtekarlık engellendi: ${reasons} (+150 ₺)`;
+          } else if (approved && !isLegit) {
+            isCorrect = false;
+            const reasons = this.getDefectReasons(this.currentStudent.defectTypes);
+            feedbackText = `✘ İHTAR ALDINIZ! Sahte kartı içeri aldınız! Sebep: ${reasons}`;
+          } else if (!approved && isLegit) {
+            isCorrect = false;
+            feedbackText = '✘ İHTAR ALDINIZ! Geçerli ve masum bir öğrencinin girişini haksız yere engellediniz!';
+          }
+
+          if (isCorrect) {
+            audio.approve();
+            this.correctCount++;
+            this.score += approved ? 100 : 150;
+            this.showFeedback(feedbackText, 'success');
+          } else {
+            audio.strike();
+            this.strikes++;
+            this.showFeedback(feedbackText, 'error');
+          }
+
+          this.updateHeader();
+        }, 260);
+
+        // 3. Kolun masaya dinlenme pozisyonuna dönmesi
+        setTimeout(() => {
+          if (this.dom.guardArmRight) this.dom.guardArmRight.classList.remove('stamping-active');
+          if (this.dom.heldStampBase) this.dom.heldStampBase.className = 'held-stamp-base';
+        }, 550);
+
+        // 4. Öğrencinin çıkışı: yalnızca sınıf değişimi → CSS transition (translate3d + scale3d) GPU'da oynar
+        setTimeout(() => {
+          this.dom.studentContainer.className = approved ? 'exit-approved' : 'exit-rejected';
+
+          // Balon karakterin çocuk elemanı: onunla birlikte kayar/küçülür, kaybolmadan hemen önce kapanır
+          setTimeout(() => {
+            this.dom.speechBubble.classList.remove('visible');
+          }, 300);
+
+          if (this.strikes >= 3) {
+            setTimeout(() => this.triggerGameOver(), 800);
+            return;
+          }
+
+          setTimeout(() => {
+            this.studentIndex++;
+            this.loadNextStudent();
+          }, 750);
+        }, 900);
+      }
+
+      getDefectReasons(types) {
+        const map = {
+          'EXPIRED_DATE': 'Son geçerlilik tarihi geçmiş (2026 yılındayız)',
+          'INVALID_FACULTY': 'Fakülte Beyazıt kampüsünde yer almıyor',
+          'BAD_STUDENT_NO': 'Öğrenci numarası geçersiz formatta',
+          'BAD_SEAL': 'Rektörlük mührü geçersiz veya eksik',
+          'PHOTO_MISMATCH': 'Vesikalık fotoğraf ile kişi özellikleri uyuşmuyor'
+        };
+        return types.map(t => map[t] || t).join(' & ');
+      }
+
+      showFeedback(text, type) {
+        const banner = this.dom.feedbackBanner;
+        banner.textContent = text;
+        banner.className = `show ${type}`;
+        setTimeout(() => {
+          banner.className = '';
+        }, 2800);
+      }
+
+      finishShift() {
+        this.dom.reportTitle.textContent = 'VARDİYA TAMAMLANDI';
+        this.dom.reportTitle.className = 'report-title shift-win';
+        this.dom.reportSubtitle.textContent = `Vardiya ${this.shift} Başarıyla Bitti!`;
+        
+        this.dom.reportTotal.textContent = this.maxStudents;
+        this.dom.reportCorrect.textContent = `${this.correctCount} / ${this.maxStudents}`;
+        this.dom.reportStrikes.textContent = `${this.strikes} / 3`;
+        this.dom.reportSalary.textContent = `${this.score} ₺`;
+
+        let msg = '';
+        if (this.strikes === 0) {
+          msg = 'Kusursuz nöbet! Rektörlük güvenlik amirliği performansınızı takdirle karşıladı.';
+        } else {
+          msg = `Günü tamamladınız fakat ${this.strikes} ihtar aldınız. Bir sonraki vardiyada dikkatli olun.`;
+        }
+        this.dom.reportMessage.textContent = msg;
+        this.dom.btnReportAction.textContent = 'SONRAKİ VARDİYAYA GEÇ';
+
+        audio.approve();
+        this.dom.reportModal.classList.add('active');
+      }
+
+      triggerGameOver() {
+        this.dom.reportTitle.textContent = 'KOVULDUNUZ! (GAME OVER)';
+        this.dom.reportTitle.className = 'report-title game-over';
+        this.dom.reportSubtitle.textContent = 'Disiplin Kurulu Kararıyla Görevden Alındınız';
+
+        this.dom.reportTotal.textContent = `${this.studentIndex + 1}`;
+        this.dom.reportCorrect.textContent = `${this.correctCount}`;
+        this.dom.reportStrikes.textContent = `3 / 3 (SINIR AŞILDI)`;
+        this.dom.reportSalary.textContent = `${this.score} ₺`;
+
+        this.dom.reportMessage.textContent = '3 kez kural ihlali yaptınız! Ya masum öğrencileri mağdur ettiniz ya da sahtekarları kampüse soktunuz. Güvenlik kartınız iptal edildi.';
+        this.dom.btnReportAction.textContent = 'TEKRAR DENE (BAŞTAN BAŞLA)';
+
+        audio.reject();
+        this.dom.reportModal.classList.add('active');
+      }
+    }
+
+    // OYUNU BAŞLAT
+    window.addEventListener('DOMContentLoaded', () => {
+      new GameController();
+    });
+  </script>
+</body>
+</html>
